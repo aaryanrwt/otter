@@ -9,6 +9,8 @@ use types::ProgressSnapshot;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuiSettings {
+    #[serde(default)]
+    pub user_name: String,
     pub default_download_dir: String,
     pub concurrent_downloads: usize,
     pub bandwidth_limit_mb_s: Option<f64>,
@@ -29,6 +31,7 @@ impl Default for GuiSettings {
         };
 
         Self {
+            user_name: String::new(),
             default_download_dir: default_dir,
             concurrent_downloads: 5,
             bandwidth_limit_mb_s: None,

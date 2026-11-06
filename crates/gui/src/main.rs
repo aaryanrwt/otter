@@ -49,40 +49,51 @@ fn main() -> Result<()> {
     let handler_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
         .with_custom_protocol("otter".into(), move |_webview, request| {
-            let uri = request.uri().to_string();
-            if uri.ends_with("/images/flying") {
+            let uri = request.uri().to_string().to_lowercase();
+            if uri.contains("flying") {
                 Response::builder()
                     .header(CONTENT_TYPE, "image/png")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "public, max-age=86400")
                     .body(MASCOT_FLYING.into())
                     .unwrap()
-            } else if uri.ends_with("/images/focused") {
+            } else if uri.contains("focused") {
                 Response::builder()
                     .header(CONTENT_TYPE, "image/png")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "public, max-age=86400")
                     .body(MASCOT_FOCUSED.into())
                     .unwrap()
-            } else if uri.ends_with("/images/cheerful") {
+            } else if uri.contains("cheerful") {
                 Response::builder()
                     .header(CONTENT_TYPE, "image/png")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "public, max-age=86400")
                     .body(MASCOT_CHEERFUL.into())
                     .unwrap()
-            } else if uri.ends_with("/images/sleeping") {
+            } else if uri.contains("sleeping") {
                 Response::builder()
                     .header(CONTENT_TYPE, "image/png")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "public, max-age=86400")
                     .body(MASCOT_SLEEPING.into())
                     .unwrap()
-            } else if uri.ends_with("/style.css") {
+            } else if uri.contains("style.css") {
                 Response::builder()
                     .header(CONTENT_TYPE, "text/css")
+                    .header("Access-Control-Allow-Origin", "*")
                     .body(STYLE_CSS.as_bytes().into())
                     .unwrap()
-            } else if uri.ends_with("/app.js") {
+            } else if uri.contains("app.js") {
                 Response::builder()
                     .header(CONTENT_TYPE, "application/javascript")
+                    .header("Access-Control-Allow-Origin", "*")
                     .body(APP_JS.as_bytes().into())
                     .unwrap()
             } else {
                 Response::builder()
                     .header(CONTENT_TYPE, "text/html")
+                    .header("Access-Control-Allow-Origin", "*")
                     .body(INDEX_HTML.as_bytes().into())
                     .unwrap()
             }
