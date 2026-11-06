@@ -143,18 +143,18 @@ function setupWindowControls() {
 
 // Setup Filters
 function setupFilters() {
-  document.querySelectorAll(".filter-pills-row .pill-btn[data-filter]").forEach(pill => {
+  document.querySelectorAll(".filter-pills-row .pill[data-filter], .filter-pills-row .pill-btn[data-filter]").forEach(pill => {
     pill.addEventListener("click", () => {
-      document.querySelectorAll(".filter-pills-row .pill-btn[data-filter]").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".filter-pills-row .pill[data-filter], .filter-pills-row .pill-btn[data-filter]").forEach(p => p.classList.remove("active"));
       pill.classList.add("active");
       currentFilter = pill.getAttribute("data-filter");
       renderDownloads();
     });
   });
 
-  document.querySelectorAll(".filter-pills-row .pill-btn[data-lib-filter]").forEach(pill => {
+  document.querySelectorAll(".filter-pills-row .pill[data-lib-filter], .filter-pills-row .pill-btn[data-lib-filter]").forEach(pill => {
     pill.addEventListener("click", () => {
-      document.querySelectorAll(".filter-pills-row .pill-btn[data-lib-filter]").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".filter-pills-row .pill[data-lib-filter], .filter-pills-row .pill-btn[data-lib-filter]").forEach(p => p.classList.remove("active"));
       pill.classList.add("active");
       currentLibFilter = pill.getAttribute("data-lib-filter");
       renderLibrary();

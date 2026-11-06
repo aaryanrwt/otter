@@ -367,28 +367,40 @@ body {
   margin-top: 4px;
 }
 
-.pill {
+.pill,
+.pill-btn {
   border: 1px solid var(--border-subtle);
-  background-color: #FFFFFF;
+  background-color: var(--bg-card);
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   padding: 6px 16px;
   border-radius: 9999px;
   cursor: pointer;
   transition: all 0.15s ease;
+  outline: none;
 }
 
-.pill:hover {
+.pill:hover,
+.pill-btn:hover {
   background-color: var(--bg-card-hover);
   color: var(--text-primary);
+  border-color: #D1D5DB;
 }
 
-.pill.active {
+.pill.active,
+.pill-btn.active {
   background-color: var(--text-primary);
   color: #FFFFFF;
   border-color: var(--text-primary);
   font-weight: 600;
+}
+
+body[data-theme="dark"] .pill.active,
+body[data-theme="dark"] .pill-btn.active {
+  background-color: var(--accent-pink);
+  border-color: var(--accent-pink);
+  color: #FFFFFF;
 }
 
 /* Welcome Hero Card (Overview) */

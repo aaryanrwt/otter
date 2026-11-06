@@ -120,7 +120,7 @@
               <p class="welcome-desc">Otter is quietly managing your downloads across all apps.</p>
             </div>
             <div class="hero-mascot-col">
-              <img src="otter://app/images/flying" alt="Flying Otter Mascot" class="mascot-hero">
+              <img src="__MASCOT_FLYING__" alt="Flying Otter Mascot" class="mascot-hero">
             </div>
           </div>
 
@@ -192,18 +192,18 @@
 
         <!-- 2. DOWNLOADS VIEW -->
         <section class="view" id="view-downloads">
-          <div class="downloads-top-bar">
-            <div>
-              <h1 class="view-title">Downloads <span class="pink-dot">.</span></h1>
-              <p class="view-subtitle">All your downloads, from anywhere on your PC.</p>
+          <div class="page-header-row">
+            <div class="page-title-col">
+              <h1 class="page-title">Downloads <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">All your downloads, from anywhere on your PC.</p>
             </div>
-            <div class="top-bar-actions">
-              <div class="search-box">
+            <div class="page-header-actions">
+              <div class="search-wrap">
                 <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="11" cy="11" r="8"/>
                   <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                 </svg>
-                <input type="text" id="search-downloads-input" placeholder="Search downloads...">
+                <input type="text" class="search-input" id="search-downloads-input" placeholder="Search downloads...">
               </div>
               <button class="btn-primary" id="btn-open-add-modal">
                 <span>+ Add Download</span>
@@ -213,11 +213,11 @@
 
           <!-- Filter Pills -->
           <div class="filter-pills-row">
-            <button class="pill-btn active" data-filter="all">All</button>
-            <button class="pill-btn" data-filter="active">Active</button>
-            <button class="pill-btn" data-filter="paused">Paused</button>
-            <button class="pill-btn" data-filter="completed">Completed</button>
-            <button class="pill-btn" data-filter="failed">Failed</button>
+            <button class="pill active" data-filter="all">All</button>
+            <button class="pill" data-filter="active">Active</button>
+            <button class="pill" data-filter="paused">Paused</button>
+            <button class="pill" data-filter="completed">Completed</button>
+            <button class="pill" data-filter="failed">Failed</button>
           </div>
 
           <!-- Downloads List -->
@@ -229,16 +229,16 @@
 
           <!-- Mascot Bottom Right -->
           <div class="mascot-bottom-right">
-            <img src="otter://app/images/focused" alt="Focused Otter with Laptop and Coffee" class="mascot-focused">
+            <img src="__MASCOT_FOCUSED__" alt="Focused Otter with Laptop and Coffee" class="mascot-focused">
           </div>
         </section>
 
         <!-- 3. ACTIVITY VIEW -->
         <section class="view" id="view-activity">
-          <div class="activity-top-bar">
-            <div>
-              <h1 class="view-title">Activity <span class="pink-dot">.</span></h1>
-              <p class="view-subtitle">Otter automatically detects downloads from your apps.</p>
+          <div class="page-header-row">
+            <div class="page-title-col">
+              <h1 class="page-title">Activity <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">Otter automatically detects downloads from your apps.</p>
             </div>
             <div class="live-detection-wrap">
               <span class="live-label">Live Detection</span>
@@ -355,27 +355,27 @@
 
           <!-- Mascot Bottom Left -->
           <div class="mascot-bottom-left">
-            <img src="otter://app/images/cheerful" alt="Cheerful Otter Popping Out of Pink Box" class="mascot-cheerful">
+            <img src="__MASCOT_CHEERFUL__" alt="Cheerful Otter Popping Out of Pink Box" class="mascot-cheerful">
           </div>
         </section>
 
         <!-- 4. LIBRARY VIEW -->
         <section class="view" id="view-library">
-          <div class="downloads-top-bar">
-            <div>
-              <h1 class="view-title">Library <span class="pink-dot">.</span></h1>
-              <p class="view-subtitle">Organized by models, datasets, archives, and media.</p>
+          <div class="page-header-row">
+            <div class="page-title-col">
+              <h1 class="page-title">Library <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">Organized by models, datasets, archives, and media.</p>
             </div>
           </div>
 
           <!-- Library Filter Tabs -->
           <div class="filter-pills-row">
-            <button class="pill-btn active" data-lib-filter="all">All</button>
-            <button class="pill-btn" data-lib-filter="models">Models</button>
-            <button class="pill-btn" data-lib-filter="datasets">Datasets</button>
-            <button class="pill-btn" data-lib-filter="videos">Videos</button>
-            <button class="pill-btn" data-lib-filter="archives">Archives</button>
-            <button class="pill-btn" data-lib-filter="documents">Documents</button>
+            <button class="pill active" data-lib-filter="all">All</button>
+            <button class="pill" data-lib-filter="models">Models</button>
+            <button class="pill" data-lib-filter="datasets">Datasets</button>
+            <button class="pill" data-lib-filter="videos">Videos</button>
+            <button class="pill" data-lib-filter="archives">Archives</button>
+            <button class="pill" data-lib-filter="documents">Documents</button>
           </div>
 
           <div class="downloads-list" id="library-container">
@@ -387,10 +387,10 @@
 
         <!-- 5. ENGINE TELEMETRY VIEW -->
         <section class="view" id="view-engine">
-          <div class="downloads-top-bar">
-            <div>
-              <h1 class="view-title">Engine <span class="pink-dot">.</span></h1>
-              <p class="view-subtitle">Real-time telemetry, SQLite WAL state, and Win32 hardware inspection.</p>
+          <div class="page-header-row">
+            <div class="page-title-col">
+              <h1 class="page-title">Engine <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">Real-time telemetry, SQLite WAL state, and Win32 hardware inspection.</p>
             </div>
             <button class="btn-primary" id="btn-run-doctor">
               <span>Run Diagnostics</span>
@@ -633,7 +633,7 @@
 
             <!-- Sleeping Mascot Top Right -->
             <div class="mascot-settings-top">
-              <img src="otter://app/images/sleeping" alt="Sleeping Otter on Pink Paw Pillow" class="mascot-sleeping">
+              <img src="__MASCOT_SLEEPING__" alt="Sleeping Otter on Pink Paw Pillow" class="mascot-sleeping">
             </div>
           </div>
         </section>

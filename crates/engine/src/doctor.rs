@@ -114,6 +114,7 @@ impl DoctorEngine {
         }
 
         // Test Write Permission
+        let _ = std::fs::create_dir_all(&target);
         let test_file = target.join(".otter_doctor_probe.tmp");
         match std::fs::write(&test_file, b"otter_probe") {
             Ok(_) => {
@@ -212,13 +213,16 @@ impl DoctorEngine {
             Ok(resp) => {
                 let status_code = resp.status();
                 let lat = ol_start.elapsed().as_millis() as u64;
-                if status_code.is_success() || status_code == reqwest::StatusCode::UNAUTHORIZED {
-                    // v2 root returns 401 Unauthorized or 200 by design for Docker registry spec
+                if status_code.is_success()
+                    || status_code == reqwest::StatusCode::UNAUTHORIZED
+                    || status_code == reqwest::StatusCode::NOT_FOUND
+                {
+                    // OCI v2 root returns 401, 404 or 200 by design when pinged without repository namespace
                     checks.push(DoctorCheckItem {
                         category: "Registries".to_string(),
                         name: "Ollama v2 Registry CDN".to_string(),
                         status: DoctorStatus::Pass,
-                        message: format!("Endpoint responsive (HTTP {})", status_code),
+                        message: format!("CDN endpoint reachable (HTTP {})", status_code),
                         latency_ms: Some(lat),
                     });
                 } else {

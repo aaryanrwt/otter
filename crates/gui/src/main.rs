@@ -4,6 +4,8 @@ mod detector;
 mod state;
 
 use anyhow::Result;
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use detector::UrlDetector;
 use state::{AppState, GuiSettings};
 use std::sync::Arc;
@@ -45,56 +47,42 @@ fn main() -> Result<()> {
         .with_decorations(true)
         .build(&event_loop)?;
 
+    // Inline mascot PNGs as base64 data URIs into HTML to guarantee 100% offline rendering without protocol issues
+    let flying_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_FLYING));
+    let focused_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_FOCUSED));
+    let cheerful_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_CHEERFUL));
+    let sleeping_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_SLEEPING));
+
+    let inlined_html = INDEX_HTML
+        .replace("__MASCOT_FLYING__", &flying_b64)
+        .replace("__MASCOT_FOCUSED__", &focused_b64)
+        .replace("__MASCOT_CHEERFUL__", &cheerful_b64)
+        .replace("__MASCOT_SLEEPING__", &sleeping_b64);
+
+    let html_bytes = inlined_html.into_bytes();
+
     // Custom protocol handler for otter:// schema
     let handler_proxy = proxy.clone();
     let webview = WebViewBuilder::new()
         .with_custom_protocol("otter".into(), move |_webview, request| {
             let uri = request.uri().to_string().to_lowercase();
-            if uri.contains("flying") {
+            if uri.contains("style.css") {
                 Response::builder()
-                    .header(CONTENT_TYPE, "image/png")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .header("Cache-Control", "public, max-age=86400")
-                    .body(MASCOT_FLYING.into())
-                    .unwrap()
-            } else if uri.contains("focused") {
-                Response::builder()
-                    .header(CONTENT_TYPE, "image/png")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .header("Cache-Control", "public, max-age=86400")
-                    .body(MASCOT_FOCUSED.into())
-                    .unwrap()
-            } else if uri.contains("cheerful") {
-                Response::builder()
-                    .header(CONTENT_TYPE, "image/png")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .header("Cache-Control", "public, max-age=86400")
-                    .body(MASCOT_CHEERFUL.into())
-                    .unwrap()
-            } else if uri.contains("sleeping") {
-                Response::builder()
-                    .header(CONTENT_TYPE, "image/png")
-                    .header("Access-Control-Allow-Origin", "*")
-                    .header("Cache-Control", "public, max-age=86400")
-                    .body(MASCOT_SLEEPING.into())
-                    .unwrap()
-            } else if uri.contains("style.css") {
-                Response::builder()
-                    .header(CONTENT_TYPE, "text/css")
+                    .header(CONTENT_TYPE, "text/css; charset=utf-8")
                     .header("Access-Control-Allow-Origin", "*")
                     .body(STYLE_CSS.as_bytes().into())
                     .unwrap()
             } else if uri.contains("app.js") {
                 Response::builder()
-                    .header(CONTENT_TYPE, "application/javascript")
+                    .header(CONTENT_TYPE, "application/javascript; charset=utf-8")
                     .header("Access-Control-Allow-Origin", "*")
                     .body(APP_JS.as_bytes().into())
                     .unwrap()
             } else {
                 Response::builder()
-                    .header(CONTENT_TYPE, "text/html")
+                    .header(CONTENT_TYPE, "text/html; charset=utf-8")
                     .header("Access-Control-Allow-Origin", "*")
-                    .body(INDEX_HTML.as_bytes().into())
+                    .body(html_bytes.clone().into())
                     .unwrap()
             }
         })
