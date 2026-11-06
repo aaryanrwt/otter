@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Otter</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- App Container -->
+  <div class="app-layout">
+    <!-- Top Titlebar -->
+    <header class="titlebar">
+      <div class="titlebar-left">
+        <svg class="paw-icon" viewBox="0 0 24 24" fill="currentColor">
+          <ellipse cx="12" cy="15" rx="4.5" ry="4"/>
+          <ellipse cx="6.5" cy="10" rx="2.2" ry="3"/>
+          <ellipse cx="10" cy="7" rx="2.2" ry="3"/>
+          <ellipse cx="14" cy="7" rx="2.2" ry="3"/>
+          <ellipse cx="17.5" cy="10" rx="2.2" ry="3"/>
+        </svg>
+        <span class="app-brand">Otter</span>
+      </div>
+      <div class="titlebar-drag"></div>
+      <div class="titlebar-controls">
+        <button class="win-btn" id="btn-minimize" title="Minimize">−</button>
+        <button class="win-btn" id="btn-maximize" title="Maximize">□</button>
+        <button class="win-btn win-close" id="btn-close" title="Close">✕</button>
+      </div>
+    </header>
+
+    <!-- Main Body: Sidebar + Views -->
+    <div class="main-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <nav class="nav-menu">
+          <button class="nav-item active" data-view="view-overview">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7" rx="2"/>
+              <rect x="14" y="3" width="7" height="7" rx="2"/>
+              <rect x="14" y="14" width="7" height="7" rx="2"/>
+              <rect x="3" y="14" width="7" height="7" rx="2"/>
+            </svg>
+            <span>Overview</span>
+          </button>
+          
+          <button class="nav-item" data-view="view-downloads">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            <span>Downloads</span>
+            <span class="nav-badge" id="nav-badge">0</span>
+          </button>
+
+          <button class="nav-item" data-view="view-activity">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+            <span>Activity</span>
+          </button>
+
+          <button class="nav-item" data-view="view-library">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            <span>Library</span>
+          </button>
+
+          <button class="nav-item" data-view="view-engine">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="4" y="4" width="16" height="16" rx="2"/>
+              <rect x="9" y="9" width="6" height="6"/>
+              <line x1="9" y1="1" x2="9" y2="4"/>
+              <line x1="15" y1="1" x2="15" y2="4"/>
+              <line x1="9" y1="20" x2="9" y2="23"/>
+              <line x1="15" y1="20" x2="15" y2="23"/>
+              <line x1="20" y1="9" x2="23" y2="9"/>
+              <line x1="20" y1="14" x2="23" y2="14"/>
+              <line x1="1" y1="9" x2="4" y2="9"/>
+              <line x1="1" y1="14" x2="4" y2="14"/>
+            </svg>
+            <span>Engine</span>
+          </button>
+
+          <button class="nav-item" data-view="view-settings">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>Settings</span>
+          </button>
+        </nav>
+      </aside>
+
+      <!-- Viewport Area -->
+      <main class="content-viewport">
+        <!-- 1. OVERVIEW VIEW -->
+        <section class="view active" id="view-overview">
+          <div class="welcome-hero-card">
+            <div class="hero-text-col">
+              <span class="welcome-sub">Welcome back,</span>
+              <h1 class="welcome-title">Aaryan <span class="pink-dot">.</span></h1>
+              <p class="welcome-desc">Otter is quietly managing your downloads across all apps.</p>
+            </div>
+            <div class="hero-mascot-col">
+              <img src="otter://images/flying" alt="Flying Otter Mascot" class="mascot-hero">
+            </div>
+          </div>
+
+          <!-- Summary Metric Cards -->
+          <div class="metric-cards-row">
+            <div class="stat-card">
+              <div class="stat-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M12 5v14M19 12l-7 7-7-7"/>
+                </svg>
+              </div>
+              <div class="stat-meta">
+                <span class="stat-val" id="stat-active-count">0</span>
+                <span class="stat-lbl">Active</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              </div>
+              <div class="stat-meta">
+                <span class="stat-val" id="stat-completed-count">0</span>
+                <span class="stat-lbl">Completed</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+              </div>
+              <div class="stat-meta">
+                <span class="stat-val" id="stat-total-speed">0 MB/s</span>
+                <span class="stat-lbl">Total Speed</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                  <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                  <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                </svg>
+              </div>
+              <div class="stat-meta">
+                <span class="stat-val" id="stat-downloaded-size">0 GB</span>
+                <span class="stat-lbl">Downloaded</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Downloads Section -->
+          <div class="section-header-row">
+            <h2 class="section-title">Active Downloads</h2>
+            <button class="link-btn" id="btn-view-all-downloads">View All →</button>
+          </div>
+
+          <div class="active-downloads-list" id="overview-active-list">
+            <!-- Populated dynamically via app.js -->
+            <div class="empty-state-card" id="overview-empty-state">
+              <p>No active downloads in flight. Paste a URL or click Add Download to begin.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. DOWNLOADS VIEW -->
+        <section class="view" id="view-downloads">
+          <div class="page-header-row">
+            <div>
+              <h1 class="page-title">Downloads <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">All your downloads, from anywhere on your PC.</p>
+            </div>
+            <div class="page-header-actions">
+              <div class="search-wrap">
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input type="text" class="search-input" id="downloads-search" placeholder="Search downloads...">
+              </div>
+              <button class="btn-primary" id="btn-open-add-modal">+ Add Download</button>
+            </div>
+          </div>
+
+          <!-- Filter Pills -->
+          <div class="filter-pills-row">
+            <button class="pill active" data-filter="all">All</button>
+            <button class="pill" data-filter="active">Active</button>
+            <button class="pill" data-filter="paused">Paused</button>
+            <button class="pill" data-filter="completed">Completed</button>
+            <button class="pill" data-filter="error">Failed</button>
+          </div>
+
+          <!-- Downloads List -->
+          <div class="downloads-cards-container" id="downloads-list">
+            <!-- Populated dynamically via app.js -->
+          </div>
+
+          <!-- Bottom Right Focused Otter Mascot -->
+          <div class="mascot-bottom-right">
+            <img src="otter://images/focused" alt="Focused Otter with Laptop and Coffee" class="mascot-focused">
+          </div>
+        </section>
+
+        <!-- 3. ACTIVITY VIEW -->
+        <section class="view" id="view-activity">
+          <div class="page-header-row">
+            <div>
+              <h1 class="page-title">Activity <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">Otter automatically detects downloads from your apps.</p>
+            </div>
+            <div class="live-toggle-wrap">
+              <span class="live-toggle-label">Live Detection</span>
+              <label class="switch">
+                <input type="checkbox" id="toggle-live-detection" checked>
+                <span class="slider round"></span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Activity List -->
+          <div class="activity-list" id="activity-cards-list">
+            <div class="activity-card">
+              <div class="act-icon-brand chrome-icon">🌐</div>
+              <div class="act-info">
+                <span class="act-name">Chrome</span>
+                <span class="act-sub">Direct web downloads • Browser integration active</span>
+              </div>
+              <div class="act-speed-badge">
+                <span class="speed-bars">📶</span>
+                <span id="act-speed-chrome">Ready</span>
+              </div>
+              <span class="chevron">›</span>
+            </div>
+
+            <div class="activity-card">
+              <div class="act-icon-brand steam-icon">🎮</div>
+              <div class="act-info">
+                <span class="act-name">Steam</span>
+                <span class="act-sub">Steam Store protocol handoff & library detection</span>
+              </div>
+              <div class="act-speed-badge">
+                <span class="speed-bars">📶</span>
+                <span>Standby</span>
+              </div>
+              <span class="chevron">›</span>
+            </div>
+
+            <div class="activity-card">
+              <div class="act-icon-brand epic-icon">⚡</div>
+              <div class="act-info">
+                <span class="act-name">Epic Games</span>
+                <span class="act-sub">Epic Games Store product URLs & launcher integration</span>
+              </div>
+              <div class="act-speed-badge">
+                <span class="speed-bars">📶</span>
+                <span>Standby</span>
+              </div>
+              <span class="chevron">›</span>
+            </div>
+
+            <div class="activity-card">
+              <div class="act-icon-brand hf-icon">🤗</div>
+              <div class="act-info">
+                <span class="act-name">Hugging Face</span>
+                <span class="act-sub">Multi-stream Range model weights & dataset shards</span>
+              </div>
+              <div class="act-speed-badge">
+                <span class="speed-bars">📶</span>
+                <span id="act-speed-hf">AIMD Active</span>
+              </div>
+              <span class="chevron">›</span>
+            </div>
+
+            <div class="activity-card">
+              <div class="act-icon-brand gh-icon">🐙</div>
+              <div class="act-info">
+                <span class="act-name">GitHub / Ollama</span>
+                <span class="act-sub">Physical GGUF layer blobs & release assets</span>
+              </div>
+              <div class="act-speed-badge completed-badge">
+                <span>✓ Active</span>
+              </div>
+              <span class="chevron">›</span>
+            </div>
+          </div>
+
+          <!-- Bottom Left Cheerful Mascot -->
+          <div class="mascot-bottom-left">
+            <img src="otter://images/cheerful" alt="Cheerful Otter Popping Out of Pink Box" class="mascot-cheerful">
+          </div>
+        </section>
+
+        <!-- 4. LIBRARY VIEW -->
+        <section class="view" id="view-library">
+          <div class="page-header-row">
+            <div>
+              <h1 class="page-title">Library <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">All completed artifacts, models, and files on your PC.</p>
+            </div>
+            <div class="search-wrap">
+              <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input type="text" class="search-input" id="library-search" placeholder="Search library...">
+            </div>
+          </div>
+
+          <!-- Category Filter Pills -->
+          <div class="filter-pills-row">
+            <button class="pill active" data-lib-cat="all">All</button>
+            <button class="pill" data-lib-cat="models">Ollama & HF Models</button>
+            <button class="pill" data-lib-cat="datasets">Datasets</button>
+            <button class="pill" data-lib-cat="videos">Videos</button>
+            <button class="pill" data-lib-cat="archives">Archives</button>
+            <button class="pill" data-lib-cat="documents">Documents</button>
+          </div>
+
+          <!-- Library Items List -->
+          <div class="downloads-cards-container" id="library-items-list">
+            <!-- Populated dynamically via app.js -->
+          </div>
+        </section>
+
+        <!-- 5. ENGINE VIEW -->
+        <section class="view" id="view-engine">
+          <div class="page-header-row">
+            <div>
+              <h1 class="page-title">Engine <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">Real-time Rust core telemetry, AIMD rate control, and disk I/O.</p>
+            </div>
+            <button class="btn-primary" id="btn-run-doctor">Run Diagnostics</button>
+          </div>
+
+          <!-- Engine Status Grid -->
+          <div class="engine-grid">
+            <div class="engine-card">
+              <span class="eng-label">Adaptive AIMD Concurrency</span>
+              <span class="eng-val" id="eng-aimd-status">Active (Additive Increase)</span>
+              <span class="eng-sub">Threshold: +10% goodput gain</span>
+            </div>
+
+            <div class="engine-card">
+              <span class="eng-label">Active TCP Streams</span>
+              <span class="eng-val" id="eng-connections">0 / 16 Max Per Host</span>
+              <span class="eng-sub">Host connection semaphore bounded</span>
+            </div>
+
+            <div class="engine-card">
+              <span class="eng-label">Crash-Safe Persistence</span>
+              <span class="eng-val" id="eng-wal-status">SQLite WAL (Normal Sync)</span>
+              <span class="eng-sub">Checkpoint every 32MB / 5s</span>
+            </div>
+
+            <div class="engine-card">
+              <span class="eng-label">Disk Preallocation</span>
+              <span class="eng-val" id="eng-disk-mode">Win32 FileAllocationInfo</span>
+              <span class="eng-sub">Zero post-download file merge overhead</span>
+            </div>
+          </div>
+
+          <!-- Hardware & Storage Metrics -->
+          <div class="system-specs-card">
+            <h3 class="card-title">Host Machine Specs</h3>
+            <div class="specs-row">
+              <div class="spec-col">
+                <span class="spec-k">Device Name:</span>
+                <span class="spec-v" id="spec-device">-</span>
+              </div>
+              <div class="spec-col">
+                <span class="spec-k">Logical CPU Cores:</span>
+                <span class="spec-v" id="spec-cores">-</span>
+              </div>
+              <div class="spec-col">
+                <span class="spec-k">Physical Memory:</span>
+                <span class="spec-v" id="spec-ram">-</span>
+              </div>
+              <div class="spec-col">
+                <span class="spec-k">Free Disk Space:</span>
+                <span class="spec-v" id="spec-disk">-</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Diagnostics Log Container -->
+          <div class="doctor-log-wrap" id="doctor-results" style="display: none;">
+            <h3 class="card-title">Doctor Diagnostic Report</h3>
+            <div class="doctor-items-list" id="doctor-items-container"></div>
+          </div>
+        </section>
+
+        <!-- 6. SETTINGS VIEW -->
+        <section class="view" id="view-settings">
+          <div class="page-header-row">
+            <div>
+              <h1 class="page-title">Settings <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">Customize how Otter works for you.</p>
+            </div>
+            <!-- Top Right Sleeping Otter Mascot -->
+            <div class="mascot-settings-top">
+              <img src="otter://images/sleeping" alt="Sleeping Otter on Pink Paw Pillow" class="mascot-sleeping">
+            </div>
+          </div>
+
+          <div class="settings-two-col">
+            <!-- Settings Category Navigation -->
+            <div class="settings-subnav">
+              <button class="subnav-btn active" data-settings-pane="pane-general">General</button>
+              <button class="subnav-btn" data-settings-pane="pane-detection">Detection</button>
+              <button class="subnav-btn" data-settings-pane="pane-engine">Download Engine</button>
+              <button class="subnav-btn" data-settings-pane="pane-storage">Storage</button>
+              <button class="subnav-btn" data-settings-pane="pane-network">Network</button>
+              <button class="subnav-btn" data-settings-pane="pane-appearance">Appearance</button>
+              <button class="subnav-btn" data-settings-pane="pane-notifications">Notifications</button>
+              <button class="subnav-btn" data-settings-pane="pane-advanced">Advanced</button>
+            </div>
+
+            <!-- Settings Content Panes -->
+            <div class="settings-pane-container">
+              <!-- Pane 1: General -->
+              <div class="settings-pane active" id="pane-general">
+                <h3 class="settings-section-title">General</h3>
+                
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Start with Windows</span>
+                    <span class="setting-desc">Launch Otter automatically when you turn on your PC.</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="set-start-with-windows">
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Minimize to system tray</span>
+                    <span class="setting-desc">Keep Otter running in the background when closing the window.</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" id="set-minimize-to-tray" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Language</span>
+                  </div>
+                  <select class="setting-select" id="set-language">
+                    <option value="English">English</option>
+                  </select>
+                </div>
+
+                <h3 class="settings-section-title" style="margin-top: 24px;">Download Behavior</h3>
+
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Default download location</span>
+                  </div>
+                  <div class="setting-inline-input">
+                    <input type="text" class="setting-input" id="set-download-dir" readonly>
+                    <button class="btn-subtle" id="btn-change-download-dir">Change</button>
+                  </div>
+                </div>
+
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Concurrent downloads</span>
+                    <span class="setting-desc">Number of files to download at the same time.</span>
+                  </div>
+                  <select class="setting-select" id="set-concurrent-downloads">
+                    <option value="2">2</option>
+                    <option value="4">4</option>
+                    <option value="5" selected>5</option>
+                    <option value="8">8</option>
+                    <option value="16">16</option>
+                  </select>
+                </div>
+
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Bandwidth limit</span>
+                    <span class="setting-desc">Limit total download speed across all active connections.</span>
+                  </div>
+                  <select class="setting-select" id="set-bandwidth-limit">
+                    <option value="none">No limit</option>
+                    <option value="10">10 MB/s</option>
+                    <option value="25">25 MB/s</option>
+                    <option value="50">50 MB/s</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Other Panes (Detection, Storage, Network, etc.) -->
+              <div class="settings-pane" id="pane-detection">
+                <h3 class="settings-section-title">Detection</h3>
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Automatic Clipboard URL Detection</span>
+                    <span class="setting-desc">Prompt to download when copying media, model, or dataset links.</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-pane" id="pane-engine">
+                <h3 class="settings-section-title">Download Engine</h3>
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Dynamic AIMD Rate Control</span>
+                    <span class="setting-desc">Automatically scale streams based on bandwidth headroom.</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-pane" id="pane-storage">
+                <h3 class="settings-section-title">Storage</h3>
+                <p class="setting-desc">Otter writes directly to preallocated NTFS sparse offsets, eliminating post-download merge phases.</p>
+              </div>
+
+              <div class="settings-pane" id="pane-network">
+                <h3 class="settings-section-title">Network</h3>
+                <p class="setting-desc">Per-host connection semaphore defaults to 16 independent TCP sockets.</p>
+              </div>
+
+              <div class="settings-pane" id="pane-appearance">
+                <h3 class="settings-section-title">Appearance</h3>
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Theme</span>
+                  </div>
+                  <select class="setting-select" id="set-theme">
+                    <option value="light">Warm Ivory (Default)</option>
+                    <option value="dark">Dark</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="settings-pane" id="pane-notifications">
+                <h3 class="settings-section-title">Notifications</h3>
+                <div class="setting-item-row">
+                  <div class="setting-text">
+                    <span class="setting-name">Notify on download completion</span>
+                  </div>
+                  <label class="switch">
+                    <input type="checkbox" checked>
+                    <span class="slider round"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-pane" id="pane-advanced">
+                <h3 class="settings-section-title">Advanced</h3>
+                <p class="setting-desc">SQLite WAL manifest is stored in local app data.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- Universal URL Ingestion Modal -->
+  <div class="modal-backdrop" id="add-modal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Universal URL Ingestion</h3>
+        <button class="modal-close-btn" id="btn-close-modal">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <label class="modal-label">Paste any URL (YouTube, Instagram, Ollama, Hugging Face, Steam, Epic, Direct files):</label>
+        <div class="url-input-wrap">
+          <input type="text" class="url-input" id="modal-url-input" placeholder="Paste any URL here...">
+          <button class="btn-primary" id="btn-detect-url">Identify</button>
+        </div>
+
+        <!-- Detection Preview Card -->
+        <div class="detection-preview-card" id="detection-preview" style="display: none;">
+          <div class="preview-header">
+            <span class="preview-platform-badge" id="prev-platform">Platform</span>
+            <span class="preview-type-badge" id="prev-type">Content Type</span>
+          </div>
+          <h4 class="preview-title" id="prev-title">Resource Title</h4>
+          
+          <div class="preview-grid">
+            <div class="prev-item">
+              <span class="prev-k">Suggested File:</span>
+              <span class="prev-v" id="prev-filename">-</span>
+            </div>
+            <div class="prev-item">
+              <span class="prev-k">Destination Folder:</span>
+              <span class="prev-v" id="prev-folder">-</span>
+            </div>
+          </div>
+
+          <div class="variants-wrap" id="prev-variants-wrap" style="display: none;">
+            <label class="prev-k">Select Variant / Quality:</label>
+            <select class="setting-select" id="prev-variant-select"></select>
+          </div>
+
+          <div class="auth-notice" id="prev-auth-notice" style="display: none;">
+            <span>ℹ️</span> <span id="prev-auth-text"></span>
+          </div>
+
+          <div class="modal-actions">
+            <button class="btn-subtle" id="btn-modal-cancel">Cancel</button>
+            <button class="btn-primary" id="btn-start-download">Start Download</button>
+          </div>
+        </div>
+
+        <!-- Error Card -->
+        <div class="detection-error-card" id="detection-error" style="display: none;">
+          <span class="error-icon">⚠️</span>
+          <span class="error-msg" id="detection-error-text"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
