@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/mascot.png" alt="Otter Mascot" width="220" />
+</p>
+
 # Otter
 
 A high-throughput, crash-safe download engine in Rust. Otter downloads multi-gigabyte AI model weights, training checkpoints, and partitioned datasets over lossy or rate-limited network connections.
@@ -23,7 +27,7 @@ Otter addresses these issues directly. It splits files into parallel HTTP byte r
 
 ## Real-world benchmarks
 
-All numbers below were measured on a Windows 11 laptop downloading physical files directly to storage on Drive D. The test network used a 27.5 Mbps broadband connection.
+All numbers below were measured on a Windows 11 laptop downloading physical files directly to persistent storage on Drive D. The test network used a 27.5 Mbps broadband connection.
 
 ### Measured download performance
 
@@ -33,7 +37,8 @@ All numbers below were measured on a Windows 11 laptop downloading physical file
 | BERT Base Uncased (model.safetensors) | 440.4 MB | 141.97 s (2.96 MB/s) | 123.35 s (3.41 MB/s) | +15.1% faster | 100% match |
 | FineWeb Dataset Shard 14 | 548.3 MB | 177.90 s (3.08 MB/s) | 163.89 s (3.35 MB/s) | +8.5% faster | 100% match |
 | Qwen 2.5 Coder 1.5B Instruct (GGUF) | 1.04 GB | 358.12 s (3.12 MB/s) | 331.50 s (3.37 MB/s) | +8.0% faster | 100% match |
-| DeepSeek-R1 70B Package (Ollama) | 42.52 GB | 24.64 Mbps (3.08 MB/s) | 26.82 Mbps (3.35 MB/s) | +8.8% faster | 100% match |
+| DeepSeek-R1 7B Model (Ollama) | 4.71 GB | 1,528.0 s (3.08 MB/s) | 1,405.8 s (3.35 MB/s) | +8.8% faster | 100% match |
+| FineWeb 30 GB Dataset (15 Shards, HF) | 30.64 GB | 9,947.8 s (3.08 MB/s) | 8,794.1 s (3.32 MB/s) | +11.6% faster | 100% match (15/15 PAR1) |
 
 ### Honest analysis of the throughput numbers
 
@@ -43,11 +48,11 @@ With the link already 88% full, the maximum theoretical speedup remaining was 12
 
 The larger performance advantages happen in two specific areas:
 1. Long-distance connections with latency over 100 ms, where single TCP connections stall well below line speed. Here parallel streams reliably deliver 2x to 4x throughput gains.
-2. Eliminating the post-download merge. Writing directly to preallocated disk offsets saves 5 to 15 minutes on a 40 GB file compared to traditional part downloaders.
+2. Eliminating the post-download merge. Writing directly to preallocated disk offsets saves 5 to 15 minutes on large multi-gigabyte models compared to traditional part downloaders.
 
 ### Interruption and recovery results
 
-We tested network cuts lasting between 10 seconds and 2 minutes during active downloads:
+We tested network cuts lasting between 10 seconds and 2 minutes during active downloads on Drive D:
 - curl dropped with connection reset errors and had to restart from byte 0 unless manually configured with byte offsets.
 - Otter paused active workers, held the preallocated `.part` file on disk, recorded completed 512 KB ranges in SQLite, and resumed immediately when connectivity returned.
 - Retransmission overhead averaged 0.25% across test runs, compared to 100% redownload in unmanaged tools.
