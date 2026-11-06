@@ -1,0 +1,23 @@
+# Rust build artifacts
+/target
+
+# Temporary and test artifacts
+artifacts/
+scratch/
+test_server_dir/
+.otter/
+otter cli/
+*.part
+*.otter
+*.tmp
+*.log
+**/*.rs.bk
+
+# Local scratch and test scripts
+*.txt
+*.py
+
+# System and OS files
+.DS_Store
+Thumbs.db
+desktop.ini

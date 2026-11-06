@@ -1,0 +1,22 @@
+[package]
+name = "engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+types.workspace = true
+tokio.workspace = true
+reqwest.workspace = true
+rusqlite.workspace = true
+sha2.workspace = true
+hex.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+futures-util.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio-util.workspace = true
+chrono.workspace = true
+percent-encoding = "2.3"
