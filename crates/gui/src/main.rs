@@ -361,8 +361,10 @@ fn app_state_init(rt: &tokio::runtime::Runtime) -> Result<AppState> {
     let state = AppState::new()?;
     let bridge_clone = (*state.browser_bridge).clone();
     let manifest_clone = state.manifest.clone();
+    let manager_clone = state.manager.clone();
     rt.spawn(async move {
         bridge_clone.set_manifest(manifest_clone).await;
+        bridge_clone.set_manager(manager_clone).await;
         let server = browser_bridge::BrowserBridgeServer::new(bridge_clone, 45771);
         let _ = server.run().await;
     });

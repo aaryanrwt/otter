@@ -152,7 +152,12 @@
       left: 0;
       width: 150px;
       height: 150px;
-      transform: rotate(-90deg);
+      animation: spinArc 2s linear infinite;
+      transform-origin: 50% 50%;
+    }
+    @keyframes spinArc {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
     }
     .radial-bg {
       fill: none;
@@ -165,19 +170,77 @@
       stroke-width: 5;
       stroke-linecap: round;
       stroke-dasharray: 440;
-      stroke-dashoffset: 140;
-      animation: rotateDash 2.5s ease-in-out infinite;
-    }
-    @keyframes rotateDash {
-      0% { stroke-dashoffset: 380; transform: rotate(0deg); }
-      50% { stroke-dashoffset: 160; transform: rotate(180deg); }
-      100% { stroke-dashoffset: 380; transform: rotate(360deg); }
+      stroke-dashoffset: 300;
     }
     .mascot-img {
       width: 110px;
       height: 110px;
       object-fit: contain;
       border-radius: 50%;
+    }
+    .btn-handoff {
+      background: linear-gradient(135deg, #F43F5E, #E11D48);
+      color: white;
+      border: none;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      box-shadow: 0 2px 6px rgba(244, 63, 94, 0.3);
+      transition: all 0.2s ease;
+      margin-top: 8px;
+    }
+    .btn-handoff:hover {
+      background: linear-gradient(135deg, #E11D48, #BE123C);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(244, 63, 94, 0.4);
+    }
+    .idle-state-wrap {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 36px 12px;
+    }
+    .idle-mascot-img {
+      width: 115px;
+      height: 115px;
+      object-fit: contain;
+      margin-bottom: 16px;
+      filter: drop-shadow(0 6px 14px rgba(244, 63, 94, 0.15));
+    }
+    .idle-title {
+      font-size: 17px;
+      font-weight: 800;
+      color: #111827;
+      margin-bottom: 6px;
+    }
+    .idle-sub {
+      font-size: 12px;
+      color: #6B7280;
+      max-width: 250px;
+      line-height: 1.4;
+      margin-bottom: 16px;
+    }
+    .idle-action-btn {
+      background: #FFE4E8;
+      color: #E11D48;
+      border: none;
+      padding: 7px 16px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .idle-action-btn:hover {
+      background: #FEE2E2;
+      color: #BE123C;
     }
     .preparing-title {
       font-size: 18px;
@@ -543,8 +606,8 @@
       <!-- Active Downloads Cards List -->
       <div id="active-downloads-list"></div>
 
-      <!-- Preparing / Idle Mascot State (Shown when 0 active items) -->
-      <div class="preparing-state-wrap" id="preparing-state">
+      <!-- Preparing Mascot State (Shown for 2-3 seconds during download initialization) -->
+      <div class="preparing-state-wrap" id="preparing-state" style="display: none;">
         <div class="mascot-radial-wrap">
           <svg class="radial-svg" viewBox="0 0 150 150">
             <circle class="radial-bg" cx="75" cy="75" r="70"></circle>
@@ -554,6 +617,14 @@
         </div>
         <h2 class="preparing-title" id="preparing-title-text">Preparing Download...</h2>
         <p class="preparing-sub" id="preparing-sub-text">Detecting media and initializing download...</p>
+      </div>
+
+      <!-- Idle Ready State (Shown when 0 active items) -->
+      <div class="idle-state-wrap" id="idle-state" style="display: none;">
+        <img src="icons/mascot.png" class="idle-mascot-img" alt="Otter">
+        <h2 class="idle-title">Ready to Accelerate</h2>
+        <p class="idle-sub">Download any file in Chrome or stream media to accelerate with OTTER 0.1.0!</p>
+        <button class="idle-action-btn" id="btn-idle-history">View History</button>
       </div>
     </section>
 

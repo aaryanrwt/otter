@@ -3,11 +3,11 @@
 
 const OTTER_BRIDGE_URL = "http://127.0.0.1:45771";
 let isBridgeConnected = false;
-let autoHandoffEnabled = false;
+let autoHandoffEnabled = true;
 
-// Load settings from storage
+// Load settings from storage (defaults to true for auto-acceleration)
 chrome.storage.local.get(["autoHandoff"], (result) => {
-  autoHandoffEnabled = !!result.autoHandoff;
+  autoHandoffEnabled = result.autoHandoff !== undefined ? !!result.autoHandoff : true;
 });
 
 // Periodic heartbeat to verify OTTER desktop application is running

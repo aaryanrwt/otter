@@ -41,6 +41,7 @@ pub struct BrowserBridge {
     pub items: Arc<Mutex<HashMap<i64, BrowserDownloadItem>>>,
     pub client: reqwest::Client,
     pub manifest: Arc<tokio::sync::RwLock<Option<Arc<engine::manifest::ManifestStore>>>>,
+    pub manager: Arc<tokio::sync::RwLock<Option<Arc<engine::orchestrator::DownloadManager>>>>,
 }
 
 impl BrowserBridge {
@@ -55,12 +56,18 @@ impl BrowserBridge {
             items: Arc::new(Mutex::new(HashMap::new())),
             client,
             manifest: Arc::new(tokio::sync::RwLock::new(None)),
+            manager: Arc::new(tokio::sync::RwLock::new(None)),
         }
     }
 
     pub async fn set_manifest(&self, manifest: Arc<engine::manifest::ManifestStore>) {
         let mut w = self.manifest.write().await;
         *w = Some(manifest);
+    }
+
+    pub async fn set_manager(&self, manager: Arc<engine::orchestrator::DownloadManager>) {
+        let mut w = self.manager.write().await;
+        *w = Some(manager);
     }
 
     pub async fn get_all_items(&self) -> Vec<BrowserDownloadItem> {
@@ -638,6 +645,73 @@ async fn handle_connection(mut stream: TcpStream, bridge: BrowserBridge) -> Resu
 
                 let resp_json = serde_json::json!({ "success": true, "id": id });
                 send_json_response(&mut stream, 200, &resp_json).await?;
+            } else {
+                send_error_response(&mut stream, 400, "Invalid JSON body").await?;
+            }
+        }
+        ("POST", "/api/browser/download/handoff") => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+                let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0);
+                if let Some(item) = bridge.get_item(id).await {
+                    let manifest_opt = bridge.manifest.read().await.clone();
+                    let manager_opt = bridge.manager.read().await.clone();
+                    if let (Some(manifest), Some(manager)) = (manifest_opt, manager_opt) {
+                        let default_dir = "D:\\".to_string();
+                        let resolved_dir = BrowserBridge::resolve_download_destination_dir(
+                            &item.target_path,
+                            &default_dir,
+                        );
+                        let _ = std::fs::create_dir_all(&resolved_dir);
+                        let job_id = format!(
+                            "{:x}",
+                            chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                        );
+                        let target_path = resolved_dir.join(&item.filename);
+
+                        let job = types::JobRecord {
+                            id: job_id.clone(),
+                            url: item.url.clone(),
+                            filename: item.filename.clone(),
+                            destination: target_path.display().to_string(),
+                            total_size: item.total_bytes,
+                            downloaded_bytes: 0,
+                            status: types::DownloadStatus::Queued,
+                            resumable: true,
+                            etag: None,
+                            last_modified: None,
+                            expected_sha256: None,
+                            computed_sha256: None,
+                            error: None,
+                            created_at: chrono::Utc::now().timestamp_millis(),
+                            completed_at: None,
+                        };
+                        let _ = manifest.upsert_job(&job);
+                        bridge.set_item_handed_off(id, job_id.clone()).await;
+
+                        let mgr_clone = manager.clone();
+                        let jid_clone = job_id.clone();
+                        tokio::spawn(async move {
+                            let token = tokio_util::sync::CancellationToken::new();
+                            let _ = mgr_clone.run_job(&jid_clone, 16, token).await;
+                        });
+
+                        let resp_json = serde_json::json!({
+                            "success": true,
+                            "id": id,
+                            "job_id": job_id,
+                            "status": "HANDED_OFF"
+                        });
+                        send_json_response(&mut stream, 200, &resp_json).await?;
+                    } else {
+                        let resp_json = serde_json::json!({
+                            "success": false,
+                            "error": "Engine manager or manifest not initialized"
+                        });
+                        send_json_response(&mut stream, 503, &resp_json).await?;
+                    }
+                } else {
+                    send_error_response(&mut stream, 404, "Download item not found").await?;
+                }
             } else {
                 send_error_response(&mut stream, 400, "Invalid JSON body").await?;
             }
