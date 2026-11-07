@@ -6,6 +6,7 @@
   "permissions": [
     "downloads",
     "storage",
+    "alarms",
     "nativeMessaging",
     "http://127.0.0.1/*",
     "<all_urls>"

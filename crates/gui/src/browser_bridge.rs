@@ -122,8 +122,9 @@ impl BrowserBridge {
                             }
                             types::DownloadStatus::Active | types::DownloadStatus::Queued => {
                                 item.state = "in_progress".to_string();
-                                item.status = "OTTER Multi-Stream Active (16 Workers)".to_string();
-                                item.engine_status = "OTTER Multi-Stream Active (16 Workers)".to_string();
+                                let streams = Self::calculate_dynamic_streams(item.total_bytes);
+                                item.status = format!("OTTER Multi-Stream Active ({} Workers)", streams);
+                                item.engine_status = format!("OTTER Multi-Stream Active ({} Workers)", streams);
                             }
                             _ => {}
                         }
@@ -349,7 +350,8 @@ impl BrowserBridge {
                 });
 
                 item.is_otter_managed = true;
-                item.engine_status = "OTTER Multi-Stream Active (16 Workers)".to_string();
+                item.engine_status = format!("OTTER Multi-Stream Active ({} Workers)", streams);
+                item.status = format!("OTTER Multi-Stream Active ({} Workers)", streams);
                 item.otter_job_id = Some(job_id);
                 "PAUSE_AND_TAKEOVER".to_string()
             } else {

@@ -1,34 +1,18 @@
-// Open folder where file was downloaded
-function openFolderForDownload(downloadId, destinationPath) {
-  if (downloadId && typeof downloadId === "number") {
-    try {
-      chrome.downloads.show(downloadId);
-      return;
-    } catch (e) {
-      console.warn("chrome.downloads.show failed, trying bridge:", e);
-    }
-  }
-
-  if (destinationPath) {
-    fetch(`${OTTER_BRIDGE_URL}/api/browser/open_folder`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: destinationPath })
-    }).catch(err => console.warn("Could not open folder via bridge:", err));
-  }
-}
-
-// OTTER Browser Extension — Popup Application Logic
-// Matches official 4-screen design from media_1794066109607_9f5403a4.jpg
+// OTTER Browser Extension — Popup Application Logic v0.1.0
+// Real-time integration with high-throughput OTTER Rust Engine
 
 const OTTER_BRIDGE_URL = "http://127.0.0.1:45771";
 let currentTab = "download";
 let isEngineOnline = false;
+let autoHandoffEnabled = true;
+
+// Prevent repeated handoff requests for the same download
+const popupHandedOff = new Set();
 
 // Speed tracking state across poll intervals
 const speedHistoryMap = new Map(); // downloadId -> { bytes, time, speedBps }
 
-// Preparing loading animation state (2-3 seconds as requested)
+// Preparing loading animation state (2.5 seconds loading screen)
 let isPreparing = false;
 let prepareTimer = null;
 let lastActiveCount = 0;
@@ -62,6 +46,25 @@ const engineStatusText = document.getElementById("engine-status-text");
 
 const HISTORY_CHOICES = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "Keep Forever"];
 
+// Open folder where file was downloaded (Windows Explorer)
+function openFolderForDownload(downloadId, destinationPath) {
+  // 1. First attempt to open exact file or containing folder via OTTER Bridge Explorer process
+  if (destinationPath) {
+    fetch(`${OTTER_BRIDGE_URL}/api/browser/open_folder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: destinationPath })
+    }).catch(() => {});
+  }
+
+  // 2. Also invoke Chrome's native show finder if downloadId is a recognized browser id
+  if (downloadId && typeof downloadId === "number") {
+    try {
+      chrome.downloads.show(downloadId);
+    } catch (e) {}
+  }
+}
+
 // Initialize on popup load
 document.addEventListener("DOMContentLoaded", () => {
   setupTabs();
@@ -81,15 +84,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Tab Navigation
 function setupTabs() {
-  tabDownload.addEventListener("click", () => switchTab("download"));
-  tabHistory.addEventListener("click", () => {
-    switchTab("history");
-    pollHistory();
-  });
-  tabSettings.addEventListener("click", () => {
-    switchTab("settings");
-    checkEngineHeartbeat();
-  });
+  if (tabDownload) tabDownload.addEventListener("click", () => switchTab("download"));
+  if (tabHistory) {
+    tabHistory.addEventListener("click", () => {
+      switchTab("history");
+      pollHistory();
+    });
+  }
+  if (tabSettings) {
+    tabSettings.addEventListener("click", () => {
+      switchTab("settings");
+      checkEngineHeartbeat();
+    });
+  }
 
   if (btnIdleHistory) {
     btnIdleHistory.addEventListener("click", () => {
@@ -99,24 +106,25 @@ function setupTabs() {
   }
 
   // Clear All Button - Erases completed downloads everywhere
-  btnClearHistory.addEventListener("click", async () => {
-    try {
-      chrome.downloads.erase({ state: "complete" });
-    } catch (e) {
-      console.warn("Could not erase Chrome downloads:", e);
-    }
+  if (btnClearHistory) {
+    btnClearHistory.addEventListener("click", async () => {
+      try {
+        chrome.downloads.erase({ state: "complete" }, () => {});
+      } catch (e) {}
 
-    try {
-      await fetch(`${OTTER_BRIDGE_URL}/api/browser/history/clear`, { method: "POST" });
-    } catch (e) {
-      console.warn("Could not clear bridge history:", e);
-    }
+      try {
+        await fetch(`${OTTER_BRIDGE_URL}/api/browser/history/clear`, { method: "POST" });
+      } catch (e) {}
 
-    chrome.storage.local.set({ completedHistory: [] });
-    historyList.innerHTML = `<div class="empty-state">No download history.</div>`;
-  });
+      try {
+        chrome.storage.local.set({ completedHistory: [] });
+      } catch (e) {}
 
-
+      if (historyList) {
+        historyList.innerHTML = `<div class="empty-state">No download history.</div>`;
+      }
+    });
+  }
 
   // Settings: Keep History Choice
   if (settingHistoryChoice) {
@@ -130,56 +138,61 @@ function setupTabs() {
   }
 
   // Settings: Toggles
-  toggleAutohandoff.addEventListener("change", (e) => {
-    chrome.runtime.sendMessage({ action: "SET_AUTO_HANDOFF", enabled: e.target.checked });
-    chrome.storage.local.set({ autoHandoff: e.target.checked });
-  });
+  if (toggleAutohandoff) {
+    toggleAutohandoff.addEventListener("change", (e) => {
+      autoHandoffEnabled = e.target.checked;
+      try {
+        chrome.runtime.sendMessage({ action: "SET_AUTO_HANDOFF", enabled: autoHandoffEnabled });
+      } catch (err) {}
+      chrome.storage.local.set({ autoHandoff: autoHandoffEnabled });
+    });
+  }
 
-  toggleNotifications.addEventListener("change", (e) => {
-    chrome.storage.local.set({ notificationsEnabled: e.target.checked });
-  });
+  if (toggleNotifications) {
+    toggleNotifications.addEventListener("change", (e) => {
+      chrome.storage.local.set({ notificationsEnabled: e.target.checked });
+    });
+  }
 
-  toggleProgressPopup.addEventListener("change", (e) => {
-    chrome.storage.local.set({ showProgressPopup: e.target.checked });
-  });
+  if (toggleProgressPopup) {
+    toggleProgressPopup.addEventListener("change", (e) => {
+      chrome.storage.local.set({ showProgressPopup: e.target.checked });
+    });
+  }
 }
 
 function switchTab(tabName) {
   currentTab = tabName;
-  [tabDownload, tabHistory, tabSettings].forEach(t => t.classList.remove("active"));
-  [viewDownloads, viewHistory, viewSettings].forEach(v => v.classList.remove("active"));
+  [tabDownload, tabHistory, tabSettings].forEach(t => t && t.classList.remove("active"));
+  [viewDownloads, viewHistory, viewSettings].forEach(v => v && v.classList.remove("active"));
 
   if (tabName === "download") {
-    tabDownload.classList.add("active");
-    viewDownloads.classList.add("active");
+    if (tabDownload) tabDownload.classList.add("active");
+    if (viewDownloads) viewDownloads.classList.add("active");
   } else if (tabName === "history") {
-    tabHistory.classList.add("active");
-    viewHistory.classList.add("active");
+    if (tabHistory) tabHistory.classList.add("active");
+    if (viewHistory) viewHistory.classList.add("active");
   } else if (tabName === "settings") {
-    tabSettings.classList.add("active");
-    viewSettings.classList.add("active");
+    if (tabSettings) tabSettings.classList.add("active");
+    if (viewSettings) viewSettings.classList.add("active");
   }
 }
 
 // Load Settings from chrome.storage
 function loadSettings() {
   chrome.storage.local.get(
-    ["autoHandoff", "notificationsEnabled", "showProgressPopup", "downloadEngine", "keepHistory"],
+    ["autoHandoff", "notificationsEnabled", "showProgressPopup", "keepHistory"],
     (res) => {
-      // Auto-Handoff is enabled by default for seamless acceleration
-      const autoHandoffVal = res.autoHandoff !== undefined ? !!res.autoHandoff : true;
-      if (toggleAutohandoff) toggleAutohandoff.checked = autoHandoffVal;
-      if (res.autoHandoff === undefined) {
-        chrome.storage.local.set({ autoHandoff: true });
-        chrome.runtime.sendMessage({ action: "SET_AUTO_HANDOFF", enabled: true });
-      }
+      if (chrome.runtime.lastError) return;
+      autoHandoffEnabled = res.autoHandoff !== undefined ? !!res.autoHandoff : true;
+      if (toggleAutohandoff) toggleAutohandoff.checked = autoHandoffEnabled;
 
       if (toggleNotifications) toggleNotifications.checked = res.notificationsEnabled !== false;
       if (toggleProgressPopup) toggleProgressPopup.checked = res.showProgressPopup !== false;
 
-
       if (settingHistoryChoice && res.keepHistory) {
-        settingHistoryChoice.querySelector("span").textContent = res.keepHistory;
+        const span = settingHistoryChoice.querySelector("span");
+        if (span) span.textContent = res.keepHistory;
       }
     }
   );
@@ -188,7 +201,13 @@ function loadSettings() {
 // Real-time Engine Connection Heartbeat
 async function checkEngineHeartbeat() {
   try {
-    const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/status`, { method: "GET" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/status`, {
+      method: "GET",
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
     if (res.ok) {
       setEngineStatus(true);
     } else {
@@ -216,15 +235,15 @@ function setEngineStatus(online) {
 // Trigger Preparing Animation for 2.5 seconds (loading screen before showing download card)
 function startPreparingAnimation(onComplete) {
   isPreparing = true;
-  preparingState.style.display = "flex";
-  idleState.style.display = "none";
-  activeList.style.display = "none";
-  downloadsHeader.style.display = "none";
+  if (preparingState) preparingState.style.display = "flex";
+  if (idleState) idleState.style.display = "none";
+  if (activeList) activeList.style.display = "none";
+  if (downloadsHeader) downloadsHeader.style.display = "none";
 
   if (prepareTimer) clearTimeout(prepareTimer);
   prepareTimer = setTimeout(() => {
     isPreparing = false;
-    preparingState.style.display = "none";
+    if (preparingState) preparingState.style.display = "none";
     if (onComplete) onComplete();
     pollActiveState();
   }, 2500);
@@ -236,17 +255,22 @@ async function pollActiveState() {
 
   let otterItems = [];
   try {
-    const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/downloads`, { method: "GET" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/downloads`, {
+      method: "GET",
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const data = await res.json();
       otterItems = data.downloads || [];
       setEngineStatus(true);
     }
-  } catch (e) {
-    // Desktop engine offline
-  }
+  } catch (e) {}
 
   chrome.downloads.search({ state: "in_progress" }, (chromeItems) => {
+    if (chrome.runtime.lastError) chromeItems = [];
     const activeCombined = mergeActiveDownloads(otterItems, chromeItems || []);
 
     // If new downloads appeared while idle, show the preparing loading screen for 2.5s
@@ -268,9 +292,10 @@ function mergeActiveDownloads(otterItems, chromeItems) {
   const now = Date.now();
 
   // 1. Ingest Otter backend downloads
-  for (const it of otterItems) {
-    if (it.state === "in_progress" || it.state === "paused" || it.status.includes("Active") || it.status.includes("Eligible") || it.status.includes("Paused")) {
-      const isPaused = it.state === "paused" || it.status.toLowerCase().includes("paused");
+  for (const it of (otterItems || [])) {
+    const st = (it.status || "").toLowerCase();
+    const isPaused = it.state === "paused" || st.includes("paused");
+    if (it.state === "in_progress" || isPaused || st.includes("active") || st.includes("eligible")) {
       map.set(it.id, {
         id: it.id,
         filename: it.filename || "download",
@@ -287,8 +312,8 @@ function mergeActiveDownloads(otterItems, chromeItems) {
     }
   }
 
-  // 2. Ingest Chrome native downloads
-  for (const c of chromeItems) {
+  // 2. Ingest Chrome native downloads and auto-accelerate
+  for (const c of (chromeItems || [])) {
     if (!map.has(c.id)) {
       const fn = c.filename ? c.filename.split(/[\\/]/).pop() : "download";
       const domain = extractDomain(c.url || c.finalUrl);
@@ -314,7 +339,34 @@ function mergeActiveDownloads(otterItems, chromeItems) {
         speedHistoryMap.set(c.id, { bytes: rx, time: now, speedBps: 0 });
       }
 
+      // Auto-handoff to OTTER multi-stream: pause single stream & send to bridge
+      if (autoHandoffEnabled && !popupHandedOff.has(c.id)) {
+        popupHandedOff.add(c.id);
+        const payload = {
+          id: c.id,
+          url: c.url,
+          final_url: c.finalUrl || c.url,
+          sanitized_url: c.url,
+          filename: fn,
+          target_path: c.filename || "",
+          mime_type: c.mime || "application/octet-stream",
+          total_bytes: c.totalBytes > 0 ? c.totalBytes : null,
+          received_bytes: rx,
+          state: "in_progress",
+          referrer: c.referrer || "",
+          start_time: c.startTime || new Date().toISOString(),
+          auto_handoff_requested: true
+        };
+        fetch(`${OTTER_BRIDGE_URL}/api/browser/download/created`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
 
+        chrome.downloads.pause(c.id, () => {
+          if (chrome.runtime.lastError) {}
+        });
+      }
 
       const isPaused = !!c.paused;
       map.set(c.id, {
@@ -340,21 +392,25 @@ function renderActiveDownloads(items) {
   if (isPreparing) return;
 
   if (!items || items.length === 0) {
-    downloadsHeader.style.display = "none";
-    activeList.innerHTML = "";
-    activeList.style.display = "none";
-    preparingState.style.display = "none";
-    idleState.style.display = "flex";
+    if (downloadsHeader) downloadsHeader.style.display = "none";
+    if (activeList) {
+      activeList.innerHTML = "";
+      activeList.style.display = "none";
+    }
+    if (preparingState) preparingState.style.display = "none";
+    if (idleState) idleState.style.display = "flex";
     return;
   }
 
-  idleState.style.display = "none";
-  preparingState.style.display = "none";
-  downloadsHeader.style.display = "flex";
-  activeList.style.display = "block";
-  badgeActiveCount.textContent = items.length;
+  if (idleState) idleState.style.display = "none";
+  if (preparingState) preparingState.style.display = "none";
+  if (downloadsHeader) downloadsHeader.style.display = "flex";
+  if (activeList) activeList.style.display = "block";
+  if (badgeActiveCount) badgeActiveCount.textContent = items.length;
 
+  if (!activeList) return;
   activeList.innerHTML = "";
+
   items.forEach(item => {
     const card = document.createElement("div");
     card.className = "dl-card";
@@ -364,22 +420,19 @@ function renderActiveDownloads(items) {
       : 0;
 
     const sizeStr = item.total_bytes ? formatBytes(item.total_bytes) : formatBytes(item.received_bytes);
-
-
-
     const iconSvg = getMediaIconSvg(item.filename, item.domain);
     const isPaused = item.is_paused || (item.status && item.status.toLowerCase().includes("paused"));
     const pauseIcon = isPaused ? '▶' : '||';
     const pauseTitle = isPaused ? 'Resume / Restart' : 'Pause';
 
-    // Real dynamic speed calculation
+    // Dynamic speed formatting
     let speedStr = "";
     if (isPaused) {
       speedStr = "Paused";
     } else if (item.speed_bps > 0) {
       speedStr = `${(item.speed_bps / (1024 * 1024)).toFixed(1)} MB/s`;
     } else {
-      speedStr = "Connecting...";
+      speedStr = "Accelerating...";
     }
 
     // Accurate ETA calculation
@@ -396,7 +449,7 @@ function renderActiveDownloads(items) {
       etaStr = "In Progress";
     }
 
-    // Removed badge entirely as requested (shows nothing there in metadata)
+    // Clean UI: zero badges next to filename, pure speed and accurate progress
     card.innerHTML = `
       <div class="dl-top-row">
         <div class="media-type-icon">
@@ -432,12 +485,11 @@ function renderActiveDownloads(items) {
       </div>
     `;
 
-    // Button actions: fully integrated with OTTER engine & Chrome
+    // Pause/Resume button
     card.querySelector(".btn-pause-toggle")?.addEventListener("click", async (e) => {
       e.stopPropagation();
       const currentlyPaused = item.is_paused || (item.status && item.status.toLowerCase().includes("paused"));
       if (currentlyPaused) {
-        // Resume / Restart in both OTTER Rust Engine & browser
         try {
           await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/resume`, {
             method: "POST",
@@ -446,10 +498,11 @@ function renderActiveDownloads(items) {
           });
         } catch (err) {}
         try {
-          chrome.downloads.resume(item.id, () => {});
+          chrome.downloads.resume(item.id, () => {
+            if (chrome.runtime.lastError) {}
+          });
         } catch (err) {}
       } else {
-        // Pause in both OTTER Rust Engine & browser
         try {
           await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/pause`, {
             method: "POST",
@@ -458,12 +511,15 @@ function renderActiveDownloads(items) {
           });
         } catch (err) {}
         try {
-          chrome.downloads.pause(item.id, () => {});
+          chrome.downloads.pause(item.id, () => {
+            if (chrome.runtime.lastError) {}
+          });
         } catch (err) {}
       }
       setTimeout(pollActiveState, 200);
     });
 
+    // Cancel / Close button
     card.querySelector(".btn-cancel")?.addEventListener("click", async (e) => {
       e.stopPropagation();
       try {
@@ -474,7 +530,9 @@ function renderActiveDownloads(items) {
         });
       } catch (err) {}
       try {
-        chrome.downloads.cancel(item.id, () => {});
+        chrome.downloads.cancel(item.id, () => {
+          if (chrome.runtime.lastError) {}
+        });
       } catch (err) {}
       setTimeout(pollActiveState, 200);
     });
@@ -487,25 +545,31 @@ function renderActiveDownloads(items) {
 async function pollHistory() {
   let otterHistory = [];
   try {
-    const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/history`, { method: "GET" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1500);
+    const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/history`, {
+      method: "GET",
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
     if (res.ok) {
       const data = await res.json();
       otterHistory = data.history || [];
     }
-  } catch (e) {
-    // Engine offline
-  }
+  } catch (e) {}
 
   if (otterHistory.length > 0) {
     renderHistoryCards(otterHistory);
   } else {
-    chrome.downloads.search({ state: "complete", limit: 20 }, (chromeItems) => {
+    chrome.downloads.search({ state: "complete", limit: 30 }, (chromeItems) => {
+      if (chrome.runtime.lastError) chromeItems = [];
       renderHistoryFromChrome(chromeItems || []);
     });
   }
 }
 
 function renderHistoryCards(items) {
+  if (!historyList) return;
   if (!items || items.length === 0) {
     historyList.innerHTML = `<div class="empty-state">No download history.</div>`;
     return;
@@ -532,6 +596,7 @@ function renderHistoryCards(items) {
       <button class="menu-dots-btn" title="Open containing folder">⋮</button>
     `;
 
+    // Click on 3 dots or click anywhere on card opens folder
     card.querySelector(".menu-dots-btn")?.addEventListener("click", (e) => {
       e.stopPropagation();
       openFolderForDownload(item.id, item.destination || item.filename);
@@ -545,6 +610,7 @@ function renderHistoryCards(items) {
 }
 
 function renderHistoryFromChrome(items) {
+  if (!historyList) return;
   if (!items || items.length === 0) {
     historyList.innerHTML = `<div class="empty-state">No download history.</div>`;
     return;
@@ -572,6 +638,7 @@ function renderHistoryFromChrome(items) {
       <button class="menu-dots-btn" title="Open containing folder">⋮</button>
     `;
 
+    // Click on 3 dots or card opens folder
     card.querySelector(".menu-dots-btn")?.addEventListener("click", (e) => {
       e.stopPropagation();
       openFolderForDownload(c.id, c.filename);
@@ -584,18 +651,17 @@ function renderHistoryFromChrome(items) {
   });
 }
 
-// Helpers
+// Format Utilities
 function formatBytes(bytes) {
-  if (!bytes || bytes <= 0) return "0 B";
-  const KB = 1024, MB = KB * 1024, GB = MB * 1024;
-  if (bytes >= GB) return (bytes / GB).toFixed(1) + " GB";
-  if (bytes >= MB) return (bytes / MB).toFixed(1) + " MB";
-  if (bytes >= KB) return (bytes / KB).toFixed(0) + " KB";
-  return bytes + " B";
+  if (!bytes || bytes === 0) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB", "TB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 function formatDuration(sec) {
-  if (isNaN(sec) || sec <= 0) return "00:00:00";
+  if (sec <= 0 || isNaN(sec)) return "00:00:00";
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   const s = Math.floor(sec % 60);
@@ -607,16 +673,18 @@ function padZero(n) {
 }
 
 function extractDomain(url) {
+  if (!url) return "Direct Web";
   try {
-    const u = new URL(url);
-    return u.hostname.replace(/^www\./, "");
+    const parsed = new URL(url);
+    return parsed.hostname.replace(/^www\./, "");
   } catch (e) {
-    return "Direct Download";
+    return "Direct Web";
   }
 }
 
 function escapeHtml(str) {
-  return String(str || "")
+  if (!str) return "";
+  return String(str)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -625,15 +693,21 @@ function escapeHtml(str) {
 }
 
 function getMediaIconSvg(filename, domain) {
-  const lower = (filename + " " + domain).toLowerCase();
-  if (lower.includes("youtube") || lower.endsWith(".mp4") || lower.endsWith(".mkv") || lower.endsWith(".webm")) {
-    return `<svg viewBox="0 0 24 24" width="22" height="22" fill="#E11D48"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/><polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02" fill="white"/></svg>`;
+  const lower = (filename || "").toLowerCase();
+  const lowerDomain = (domain || "").toLowerCase();
+
+  // Video
+  if (lower.match(/\.(mp4|mkv|webm|avi|mov|flv|wmv)$/) || lowerDomain.includes("youtube") || lowerDomain.includes("vimeo")) {
+    return `<svg viewBox="0 0 24 24" width="22" height="22" fill="#E11D48"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
   }
-  if (lower.endsWith(".mp3") || lower.endsWith(".m4a") || lower.endsWith(".wav") || lower.endsWith(".flac")) {
-    return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#E11D48" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+  // Audio
+  if (lower.match(/\.(mp3|wav|ogg|flac|aac|m4a)$/) || lowerDomain.includes("soundcloud") || lowerDomain.includes("spotify")) {
+    return `<svg viewBox="0 0 24 24" width="22" height="22" fill="#E11D48"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
   }
-  if (lower.endsWith(".zip") || lower.endsWith(".rar") || lower.endsWith(".7z") || lower.endsWith(".tar") || lower.endsWith(".gz")) {
-    return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#E11D48" stroke-width="2"><path d="M21 8v13H3V3h12l6 5z"/><path d="M10 3v18"/><path d="M10 7h4"/><path d="M10 11h4"/><path d="M10 15h4"/></svg>`;
+  // Archives / ISOs / Game Installers
+  if (lower.match(/\.(zip|rar|7z|tar|gz|iso|exe|msi|dmg|pkg)$/)) {
+    return `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#E11D48" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="10" y1="12" x2="14" y2="12"/><line x1="10" y1="15" x2="14" y2="15"/></svg>`;
   }
-  return `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#E11D48" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`;
+  // Generic Document / Data
+  return `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#E11D48" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
 }
