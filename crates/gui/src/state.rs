@@ -192,7 +192,7 @@ impl AppState {
         let manifest = Arc::new(ManifestStore::open_default()?);
         let manager = Arc::new(DownloadManager::with_max_host_connections(
             manifest.clone(),
-            64,
+            256,
         )?);
         let settings = Arc::new(Mutex::new(GuiSettings::load()));
         let browser_bridge = Arc::new(crate::browser_bridge::BrowserBridge::new());

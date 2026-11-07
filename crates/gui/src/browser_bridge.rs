@@ -42,9 +42,21 @@ pub struct BrowserBridge {
     pub client: reqwest::Client,
     pub manifest: Arc<tokio::sync::RwLock<Option<Arc<engine::manifest::ManifestStore>>>>,
     pub manager: Arc<tokio::sync::RwLock<Option<Arc<engine::orchestrator::DownloadManager>>>>,
+    pub tokens: Arc<Mutex<HashMap<String, tokio_util::sync::CancellationToken>>>,
 }
 
 impl BrowserBridge {
+
+    pub fn calculate_dynamic_streams(total_bytes: Option<u64>) -> usize {
+        match total_bytes {
+            Some(size) if size >= 10 * 1024 * 1024 * 1024 => 128,
+            Some(size) if size >= 4 * 1024 * 1024 * 1024 => 64,
+            Some(size) if size >= 1024 * 1024 * 1024 => 32,
+            Some(size) if size >= 100 * 1024 * 1024 => 16,
+            Some(_) => 8,
+            None => 32,
+        }
+    }
     pub fn new() -> Self {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
@@ -57,6 +69,7 @@ impl BrowserBridge {
             client,
             manifest: Arc::new(tokio::sync::RwLock::new(None)),
             manager: Arc::new(tokio::sync::RwLock::new(None)),
+            tokens: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -317,11 +330,13 @@ impl BrowserBridge {
                 };
                 let _ = manifest.upsert_job(&job);
 
+                let streams = Self::calculate_dynamic_streams(item.total_bytes);
+                let token = tokio_util::sync::CancellationToken::new();
+                self.tokens.lock().await.insert(job_id.clone(), token.clone());
                 let mgr_clone = manager.clone();
                 let jid_clone = job_id.clone();
                 tokio::spawn(async move {
-                    let token = tokio_util::sync::CancellationToken::new();
-                    let _ = mgr_clone.run_job(&jid_clone, 16, token).await;
+                    let _ = mgr_clone.run_job(&jid_clone, streams, token).await;
                 });
 
                 item.is_otter_managed = true;
@@ -873,6 +888,78 @@ async fn handle_connection(mut stream: TcpStream, bridge: BrowserBridge) -> Resu
                 } else {
                     send_error_response(&mut stream, 404, "Download item not found").await?;
                 }
+            } else {
+                send_error_response(&mut stream, 400, "Invalid JSON body").await?;
+            }
+        }
+        ("POST", "/api/browser/download/pause") => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+                let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0);
+                let mut guard = bridge.items.lock().await;
+                if let Some(item) = guard.get_mut(&id) {
+                    item.state = "paused".to_string();
+                    item.status = "Paused".to_string();
+                    item.current_speed_bps = 0.0;
+                    if let Some(ref jid) = item.otter_job_id {
+                        let mut toks = bridge.tokens.lock().await;
+                        if let Some(t) = toks.remove(jid) {
+                            t.cancel();
+                        }
+                        if let Some(manifest) = bridge.manifest.read().await.clone() {
+                            let _ = manifest.update_status(jid, types::DownloadStatus::Paused, None);
+                        }
+                    }
+                }
+                let resp_json = serde_json::json!({ "success": true, "id": id, "paused": true });
+                send_json_response(&mut stream, 200, &resp_json).await?;
+            } else {
+                send_error_response(&mut stream, 400, "Invalid JSON body").await?;
+            }
+        }
+        ("POST", "/api/browser/download/resume") => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+                let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0);
+                let mut guard = bridge.items.lock().await;
+                if let Some(item) = guard.get_mut(&id) {
+                    item.state = "in_progress".to_string();
+                    item.status = "Active".to_string();
+                    if let Some(ref jid) = item.otter_job_id {
+                        if let (Some(manifest), Some(manager)) = (bridge.manifest.read().await.clone(), bridge.manager.read().await.clone()) {
+                            let token = tokio_util::sync::CancellationToken::new();
+                            bridge.tokens.lock().await.insert(jid.clone(), token.clone());
+                            let _ = manifest.update_status(jid, types::DownloadStatus::Active, None);
+                            let streams = BrowserBridge::calculate_dynamic_streams(item.total_bytes);
+                            let mgr_clone = manager.clone();
+                            let jid_clone = jid.clone();
+                            tokio::spawn(async move {
+                                let _ = mgr_clone.run_job(&jid_clone, streams, token).await;
+                            });
+                        }
+                    }
+                }
+                let resp_json = serde_json::json!({ "success": true, "id": id, "resumed": true });
+                send_json_response(&mut stream, 200, &resp_json).await?;
+            } else {
+                send_error_response(&mut stream, 400, "Invalid JSON body").await?;
+            }
+        }
+        ("POST", "/api/browser/download/cancel") => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+                let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0);
+                let mut guard = bridge.items.lock().await;
+                if let Some(item) = guard.remove(&id) {
+                    if let Some(ref jid) = item.otter_job_id {
+                        let mut toks = bridge.tokens.lock().await;
+                        if let Some(t) = toks.remove(jid) {
+                            t.cancel();
+                        }
+                        if let Some(manifest) = bridge.manifest.read().await.clone() {
+                            let _ = manifest.delete_job(jid);
+                        }
+                    }
+                }
+                let resp_json = serde_json::json!({ "success": true, "id": id, "cancelled": true });
+                send_json_response(&mut stream, 200, &resp_json).await?;
             } else {
                 send_error_response(&mut stream, 400, "Invalid JSON body").await?;
             }

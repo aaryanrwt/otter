@@ -81,10 +81,11 @@ impl DownloadManager {
         let client = Client::builder()
             .http1_only()
             .tcp_nodelay(true)
-            .pool_max_idle_per_host(64)
+            .pool_max_idle_per_host(256)
             .pool_idle_timeout(Duration::from_secs(90))
             .timeout(Duration::from_secs(60))
             .connect_timeout(Duration::from_secs(15))
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Otter/0.1.0")
             .build()
             .context("Failed to build HTTP client")?;
 

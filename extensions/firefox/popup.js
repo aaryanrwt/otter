@@ -269,7 +269,8 @@ function mergeActiveDownloads(otterItems, chromeItems) {
 
   // 1. Ingest Otter backend downloads
   for (const it of otterItems) {
-    if (it.state === "in_progress" || it.state === "paused" || it.status.includes("Active") || it.status.includes("Eligible")) {
+    if (it.state === "in_progress" || it.state === "paused" || it.status.includes("Active") || it.status.includes("Eligible") || it.status.includes("Paused")) {
+      const isPaused = it.state === "paused" || it.status.toLowerCase().includes("paused");
       map.set(it.id, {
         id: it.id,
         filename: it.filename || "download",
@@ -277,8 +278,9 @@ function mergeActiveDownloads(otterItems, chromeItems) {
         received_bytes: it.received_bytes || 0,
         speed_bps: it.current_speed_bps || 0,
         domain: it.domain || "Direct Web",
-        is_otter: !!it.is_otter_managed,
-        status: it.status || "Active",
+        is_otter: true,
+        is_paused: isPaused,
+        status: isPaused ? "Paused" : (it.status || "Active"),
         url: it.url || it.sanitized_url,
         estimatedEndTime: null
       });
@@ -315,6 +317,7 @@ function mergeActiveDownloads(otterItems, chromeItems) {
       // Auto-trigger handoff to ensure Chrome single stream is stopped
       chrome.runtime.sendMessage({ action: "FORCE_HANDOFF", downloadId: c.id });
 
+      const isPaused = !!c.paused;
       map.set(c.id, {
         id: c.id,
         filename: fn,
@@ -323,7 +326,8 @@ function mergeActiveDownloads(otterItems, chromeItems) {
         speed_bps: speedBps,
         domain: domain,
         is_otter: true,
-        status: "OTTER Multi-Stream Active (16 Workers)",
+        is_paused: isPaused,
+        status: isPaused ? "Paused" : "Active",
         url: c.url,
         estimatedEndTime: c.estimatedEndTime
       });
@@ -383,8 +387,35 @@ function renderActiveDownloads(items) {
     }
 
     const iconSvg = getMediaIconSvg(item.filename, item.domain);
-    const ownershipBadge = `<span class="ownership-tag tag-otter">OTTER Multi-Stream (16 Workers)</span>`;
+    const isPaused = item.is_paused || (item.status && item.status.toLowerCase().includes("paused"));
+    const pauseIcon = isPaused ? '▶' : '||';
+    const pauseTitle = isPaused ? 'Resume / Restart' : 'Pause';
 
+    // Real dynamic speed calculation
+    let speedStr = "";
+    if (isPaused) {
+      speedStr = "Paused";
+    } else if (item.speed_bps > 0) {
+      speedStr = `${(item.speed_bps / (1024 * 1024)).toFixed(1)} MB/s`;
+    } else {
+      speedStr = "Connecting...";
+    }
+
+    // Accurate ETA calculation
+    let etaStr = "";
+    if (isPaused) {
+      etaStr = "Paused";
+    } else if (item.speed_bps > 0 && item.total_bytes && item.total_bytes > item.received_bytes) {
+      const remSec = Math.round((item.total_bytes - item.received_bytes) / item.speed_bps);
+      etaStr = formatDuration(remSec) + " left";
+    } else if (item.estimatedEndTime) {
+      const remSec = Math.max(0, Math.round((new Date(item.estimatedEndTime).getTime() - Date.now()) / 1000));
+      etaStr = formatDuration(remSec) + " left";
+    } else {
+      etaStr = "In Progress";
+    }
+
+    // Removed badge entirely as requested (shows nothing there in metadata)
     card.innerHTML = `
       <div class="dl-top-row">
         <div class="media-type-icon">
@@ -392,7 +423,7 @@ function renderActiveDownloads(items) {
         </div>
         <div class="dl-info">
           <div class="dl-filename" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</div>
-          <div class="dl-metadata">${sizeStr} • ${escapeHtml(item.domain)} ${ownershipBadge}</div>
+          <div class="dl-metadata">${sizeStr} • ${escapeHtml(item.domain)}</div>
         </div>
       </div>
 
@@ -412,27 +443,59 @@ function renderActiveDownloads(items) {
           <span>${speedStr} • ~ ${etaStr}</span>
         </div>
         <div class="dl-actions">
-          <button class="card-action-btn btn-pause-toggle" data-id="${item.id}" title="${item.status.includes('Paused') ? 'Resume' : 'Pause'}">
-            ${item.status.includes('Paused') ? '▶' : '||'}
+          <button class="card-action-btn btn-pause-toggle" data-id="${item.id}" title="${pauseTitle}">
+            ${pauseIcon}
           </button>
           <button class="card-action-btn btn-cancel" data-id="${item.id}" title="Cancel">✕</button>
         </div>
       </div>
     `;
 
-    // Button actions
-    card.querySelector(".btn-pause-toggle")?.addEventListener("click", () => {
-      if (item.status.includes("Paused")) {
-        chrome.downloads.resume(item.id);
+    // Button actions: fully integrated with OTTER engine & Chrome
+    card.querySelector(".btn-pause-toggle")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const currentlyPaused = item.is_paused || (item.status && item.status.toLowerCase().includes("paused"));
+      if (currentlyPaused) {
+        // Resume / Restart in both OTTER Rust Engine & browser
+        try {
+          await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/resume`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: item.id })
+          });
+        } catch (err) {}
+        try {
+          chrome.downloads.resume(item.id, () => {});
+        } catch (err) {}
       } else {
-        chrome.downloads.pause(item.id);
+        // Pause in both OTTER Rust Engine & browser
+        try {
+          await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/pause`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: item.id })
+          });
+        } catch (err) {}
+        try {
+          chrome.downloads.pause(item.id, () => {});
+        } catch (err) {}
       }
-      setTimeout(pollActiveState, 300);
+      setTimeout(pollActiveState, 200);
     });
 
-    card.querySelector(".btn-cancel")?.addEventListener("click", () => {
-      chrome.downloads.cancel(item.id);
-      setTimeout(pollActiveState, 300);
+    card.querySelector(".btn-cancel")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try {
+        await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/cancel`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: item.id })
+        });
+      } catch (err) {}
+      try {
+        chrome.downloads.cancel(item.id, () => {});
+      } catch (err) {}
+      setTimeout(pollActiveState, 200);
     });
 
     activeList.appendChild(card);
