@@ -40,6 +40,7 @@ pub struct BrowserDownloadItem {
 pub struct BrowserBridge {
     pub items: Arc<Mutex<HashMap<i64, BrowserDownloadItem>>>,
     pub client: reqwest::Client,
+    pub manifest: Arc<tokio::sync::RwLock<Option<Arc<engine::manifest::ManifestStore>>>>,
 }
 
 impl BrowserBridge {
@@ -53,7 +54,13 @@ impl BrowserBridge {
         Self {
             items: Arc::new(Mutex::new(HashMap::new())),
             client,
+            manifest: Arc::new(tokio::sync::RwLock::new(None)),
         }
+    }
+
+    pub async fn set_manifest(&self, manifest: Arc<engine::manifest::ManifestStore>) {
+        let mut w = self.manifest.write().await;
+        *w = Some(manifest);
     }
 
     pub async fn get_all_items(&self) -> Vec<BrowserDownloadItem> {
@@ -292,6 +299,100 @@ impl BrowserBridge {
             item.otter_job_id = Some(job_id);
         }
     }
+
+    /// Dynamically discovers Chrome's configured download directories across all active Chrome profiles
+    /// by inspecting `%LOCALAPPDATA%\Google\Chrome\User Data\*\Preferences` (`download.default_directory`),
+    /// falling back to the Windows user Downloads folder (`%USERPROFILE%\Downloads`) and OTTER's configured directory.
+    /// Never uses hardcoded drive or user paths.
+    pub fn discover_chrome_download_dirs(
+        otter_default_dir: Option<&str>,
+    ) -> Vec<std::path::PathBuf> {
+        let mut dirs: Vec<std::path::PathBuf> = Vec::new();
+        let mut push_unique = |p: std::path::PathBuf| {
+            if p.as_os_str().is_empty() {
+                return;
+            }
+            let norm = p.to_string_lossy().to_lowercase();
+            if !dirs
+                .iter()
+                .any(|existing| existing.to_string_lossy().to_lowercase() == norm)
+            {
+                dirs.push(p);
+            }
+        };
+
+        // 1. Inspect Chrome User Data profiles for `download.default_directory`
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            let chrome_ud = std::path::PathBuf::from(local_app_data)
+                .join("Google")
+                .join("Chrome")
+                .join("User Data");
+            if let Ok(entries) = std::fs::read_dir(&chrome_ud) {
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name == "Default" || name.starts_with("Profile ") {
+                        let pref_path = entry.path().join("Preferences");
+                        if let Ok(raw) = std::fs::read_to_string(&pref_path) {
+                            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) {
+                                if let Some(dl_dir) = json
+                                    .get("download")
+                                    .and_then(|d| d.get("default_directory"))
+                                    .and_then(|v| v.as_str())
+                                {
+                                    let p = std::path::PathBuf::from(dl_dir);
+                                    if p.exists() {
+                                        push_unique(p);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Include standard OS user Downloads directory via USERPROFILE
+        if let Ok(user_profile) = std::env::var("USERPROFILE") {
+            let user_dl = std::path::PathBuf::from(user_profile).join("Downloads");
+            if user_dl.exists() {
+                push_unique(user_dl);
+            }
+        }
+
+        // 3. Include OTTER's configured download directory if provided
+        if let Some(otter_dir) = otter_default_dir {
+            if !otter_dir.trim().is_empty() {
+                push_unique(std::path::PathBuf::from(otter_dir));
+            }
+        }
+
+        dirs
+    }
+
+    /// Resolves the destination directory for a browser download handoff without hardcoding paths.
+    /// Preserves the parent directory of Chrome's `target_path` (including custom Save As folders),
+    /// or falls back to Chrome's configured default download directory, or OTTER's configured directory.
+    pub fn resolve_download_destination_dir(
+        target_path: &str,
+        otter_default_dir: &str,
+    ) -> std::path::PathBuf {
+        if !target_path.trim().is_empty() {
+            let p = std::path::Path::new(target_path);
+            if p.is_dir() {
+                return p.to_path_buf();
+            }
+            if let Some(parent) = p.parent() {
+                if !parent.as_os_str().is_empty() {
+                    return parent.to_path_buf();
+                }
+            }
+        }
+        let discovered = Self::discover_chrome_download_dirs(Some(otter_default_dir));
+        if let Some(first) = discovered.into_iter().next() {
+            return first;
+        }
+        std::path::PathBuf::from(otter_default_dir)
+    }
 }
 
 pub struct BrowserBridgeServer {
@@ -396,6 +497,67 @@ async fn handle_connection(mut stream: TcpStream, bridge: BrowserBridge) -> Resu
             });
             send_json_response(&mut stream, 200, &resp_json).await?;
         }
+        ("GET", "/api/browser/history") => {
+            let manifest_opt = bridge.manifest.read().await.clone();
+            let mut history_items = Vec::new();
+            if let Some(m) = manifest_opt {
+                if let Ok(jobs) = m.list_jobs() {
+                    for j in jobs
+                        .iter()
+                        .filter(|j| j.status == types::DownloadStatus::Completed)
+                    {
+                        let total_b = j.total_size.unwrap_or(j.downloaded_bytes);
+                        let elapsed_desc = if let Some(comp) = j.completed_at {
+                            let now = chrono::Utc::now().timestamp_millis();
+                            let diff_sec = (now.saturating_sub(comp) / 1000) as u64;
+                            if diff_sec < 60 {
+                                "Just now".to_string()
+                            } else if diff_sec < 3600 {
+                                format!("{} min ago", diff_sec / 60)
+                            } else if diff_sec < 86400 {
+                                format!("{} hours ago", diff_sec / 3600)
+                            } else {
+                                "Yesterday".to_string()
+                            }
+                        } else {
+                            "Completed".to_string()
+                        };
+
+                        history_items.push(serde_json::json!({
+                            "id": j.id,
+                            "filename": j.filename,
+                            "url": j.url,
+                            "destination": j.destination,
+                            "total_bytes": total_b,
+                            "total_str": format_bytes_simple(total_b),
+                            "completed_at": j.completed_at,
+                            "elapsed_desc": elapsed_desc,
+                            "status": "Completed"
+                        }));
+                    }
+                }
+            }
+            let resp_json = serde_json::json!({
+                "history": history_items,
+                "count": history_items.len()
+            });
+            send_json_response(&mut stream, 200, &resp_json).await?;
+        }
+        ("POST", "/api/browser/history/clear") => {
+            let manifest_opt = bridge.manifest.read().await.clone();
+            if let Some(m) = manifest_opt {
+                if let Ok(jobs) = m.list_jobs() {
+                    for j in jobs
+                        .iter()
+                        .filter(|j| j.status == types::DownloadStatus::Completed)
+                    {
+                        let _ = m.delete_job(&j.id);
+                    }
+                }
+            }
+            let resp_json = serde_json::json!({ "success": true });
+            send_json_response(&mut stream, 200, &resp_json).await?;
+        }
         ("POST", "/api/browser/download/created") => {
             if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
                 let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0);
@@ -486,6 +648,22 @@ async fn handle_connection(mut stream: TcpStream, bridge: BrowserBridge) -> Resu
     }
 
     Ok(())
+}
+
+fn format_bytes_simple(bytes: u64) -> String {
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    let b = bytes as f64;
+    if b >= GB {
+        format!("{:.1} GB", b / GB)
+    } else if b >= MB {
+        format!("{:.1} MB", b / MB)
+    } else if b >= KB {
+        format!("{:.0} KB", b / KB)
+    } else {
+        format!("{} B", bytes)
+    }
 }
 
 async fn send_json_response(
@@ -582,5 +760,20 @@ mod tests {
         assert_eq!(updated.state, "complete");
         assert_eq!(updated.status, "Completed");
         assert_eq!(updated.received_bytes, 104857600);
+    }
+
+    #[test]
+    fn test_dynamic_location_discovery_and_resolution() {
+        let dirs = BrowserBridge::discover_chrome_download_dirs(None);
+        assert!(
+            !dirs.is_empty(),
+            "Should dynamically discover at least one valid download directory"
+        );
+
+        // Should preserve custom Save-As parent directory from target_path
+        let custom_target = "E:\\CustomGameFolder\\game_setup.zip";
+        let resolved =
+            BrowserBridge::resolve_download_destination_dir(custom_target, "C:\\Fallback");
+        assert_eq!(resolved, std::path::PathBuf::from("E:\\CustomGameFolder"));
     }
 }

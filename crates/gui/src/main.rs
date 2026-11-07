@@ -1,4 +1,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![allow(
+    clippy::too_many_arguments,
+    clippy::collapsible_if,
+    clippy::needless_borrows_for_generic_args,
+    clippy::identity_op,
+    clippy::redundant_pattern_matching,
+    clippy::upper_case_acronyms,
+    clippy::collapsible_str_replace
+)]
 
 mod activity;
 mod browser_bridge;
@@ -297,18 +306,22 @@ fn main() -> Result<()> {
         }
     });
 
-    // Initial push of state
+    // Initial push of state and periodic live activity monitor
     {
         let init_state = app_state.clone();
         let init_proxy = proxy.clone();
         tokio_rt.spawn(async move {
             tokio::time::sleep(Duration::from_millis(200)).await;
-            let current_dir = {
-                let s = init_state.settings.lock().await;
-                s.default_download_dir.clone()
-            };
-            if let Ok(state_json) = generate_full_state(&init_state, &current_dir).await {
-                let _ = init_proxy.send_event(UserEvent::PushStateUpdate(state_json));
+            loop {
+                let (current_dir, live_det) = {
+                    let s = init_state.settings.lock().await;
+                    (s.default_download_dir.clone(), s.live_detection)
+                };
+                if let Ok(state_json) = generate_full_state(&init_state, &current_dir).await {
+                    let _ = init_proxy.send_event(UserEvent::PushStateUpdate(state_json));
+                }
+                let sleep_ms = if live_det { 1500 } else { 5000 };
+                tokio::time::sleep(Duration::from_millis(sleep_ms)).await;
             }
         });
     }
@@ -347,7 +360,9 @@ fn main() -> Result<()> {
 fn app_state_init(rt: &tokio::runtime::Runtime) -> Result<AppState> {
     let state = AppState::new()?;
     let bridge_clone = (*state.browser_bridge).clone();
+    let manifest_clone = state.manifest.clone();
     rt.spawn(async move {
+        bridge_clone.set_manifest(manifest_clone).await;
         let server = browser_bridge::BrowserBridgeServer::new(bridge_clone, 45771);
         let _ = server.run().await;
     });
@@ -448,12 +463,8 @@ async fn generate_full_state(app_state: &AppState, current_target_dir: &str) -> 
 
     let system_specs = app_state.get_system_specs(current_target_dir);
 
-    let monitored_dirs = vec![
-        std::env::var("USERPROFILE")
-            .map(|u| std::path::PathBuf::from(u).join("Downloads"))
-            .unwrap_or_default(),
-        std::path::PathBuf::from(current_target_dir),
-    ];
+    let monitored_dirs =
+        browser_bridge::BrowserBridge::discover_chrome_download_dirs(Some(current_target_dir));
     let live_det = {
         let s = app_state.settings.lock().await;
         s.live_detection
@@ -1152,19 +1163,19 @@ fn handle_ipc_message(
             rt.spawn(async move {
                 if let Some(item) = bridge.get_item(id).await {
                     let default_dir = settings_ref.lock().await.default_download_dir.clone();
-                    let target_dir = if std::path::Path::new("D:\\OTTER_CHROME_BENCHMARK").exists()
-                    {
-                        "D:\\OTTER_CHROME_BENCHMARK".to_string()
-                    } else {
-                        default_dir
-                    };
-                    let _ = std::fs::create_dir_all(&target_dir);
+                    let resolved_dir =
+                        browser_bridge::BrowserBridge::resolve_download_destination_dir(
+                            &item.target_path,
+                            &default_dir,
+                        );
+                    let target_dir = resolved_dir.display().to_string();
+                    let _ = std::fs::create_dir_all(&resolved_dir);
 
                     let job_id = format!(
                         "{:x}",
                         chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
                     );
-                    let target_path = std::path::PathBuf::from(&target_dir).join(&item.filename);
+                    let target_path = resolved_dir.join(&item.filename);
 
                     let job = types::JobRecord {
                         id: job_id.clone(),

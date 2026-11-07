@@ -243,10 +243,8 @@ pub fn parse_model_namespace_tag(raw_input: &str) -> (String, String, String) {
         let _ = rest;
     } else if lower.starts_with("ollama:") {
         s = raw_input.trim()[7..].trim().to_string();
-    } else if lower.contains("ollama.com/") {
-        if let Some(idx) = lower.find("ollama.com/") {
-            s = raw_input.trim()[idx + 11..].trim().to_string();
-        }
+    } else if let Some(idx) = lower.find("ollama.com/") {
+        s = raw_input.trim()[idx + 11..].trim().to_string();
     }
 
     let clean = s.trim_matches('/');

@@ -754,11 +754,20 @@ function renderActivity() {
 
     container.appendChild(card);
   });
+
+  const modal = document.getElementById("activityDetailBackdrop");
+  if (modal && modal.style.display === "flex" && window.currentOpenActivityAppId) {
+    const updatedItem = activities.find(a => a.app_id === window.currentOpenActivityAppId);
+    if (updatedItem) {
+      openActivityDetail(updatedItem);
+    }
+  }
 }
 
 function openActivityDetail(item) {
   const modal = document.getElementById("activityDetailBackdrop");
   if (!modal) return;
+  window.currentOpenActivityAppId = item.app_id;
 
   document.getElementById("detail-app-icon").innerHTML = item.icon_svg;
   document.getElementById("detail-app-name").textContent = item.app_name;
@@ -786,30 +795,58 @@ function openActivityDetail(item) {
           ? `<span class="badge-source-unknown">Download detected — source unknown</span>`
           : `<span style="color: #4B5563; font-weight: 500;">Source: ${f.source_website}</span>`;
 
-        let actionBtnHtml = "";
-        if (f.status === "Eligible for OTTER" && f.source_url) {
-          actionBtnHtml = `
-            <div style="margin-top: 8px;">
-              <button class="btn btn-primary btn-sm handoff-btn" data-url="${encodeURIComponent(f.source_url)}" data-filename="${encodeURIComponent(f.filename)}" style="background: #3B82F6; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">
-                🚀 Accelerate with OTTER
-              </button>
-            </div>`;
-        } else if (f.status === "OTTER Engine Active") {
-          actionBtnHtml = `
-            <div style="margin-top: 6px; font-size: 11px; color: #10B981; font-weight: 600;">
-              ✓ OTTER Multi-Stream Engine Active
-            </div>`;
+        const downloadedStr = formatBytes(f.downloaded_bytes || 0);
+        const totalStr = f.total_bytes ? formatBytes(f.total_bytes) : "Size unknown";
+        const pctStr = f.total_bytes && f.total_bytes > 0 ? ` (${f.progress_pct.toFixed(1)}%)` : "";
+        const speedStr = f.speed_str || "0.0 MB/s";
+        const ownershipStr = f.ownership || "Chrome (Native Browser Download)";
+        const destPathStr = f.destination_path || "";
+        const freeSpaceStr = f.free_disk_space_str ? ` • ${f.free_disk_space_str}` : "";
+
+        let parentDir = currentState.settings ? currentState.settings.default_download_dir : "";
+        if (destPathStr) {
+          const lastSlash = Math.max(destPathStr.lastIndexOf("\\"), destPathStr.lastIndexOf("/"));
+          if (lastSlash > 0) {
+            parentDir = destPathStr.substring(0, lastSlash);
+          }
         }
+
+        let actionBtnHtml = `<div style="margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+        if (f.status === "Eligible for OTTER" && f.source_url) {
+          actionBtnHtml += `
+            <button class="btn btn-primary btn-sm handoff-btn" data-url="${encodeURIComponent(f.source_url)}" data-filename="${encodeURIComponent(f.filename)}" data-dest="${encodeURIComponent(parentDir)}" style="background: #3B82F6; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">
+              🚀 Accelerate with OTTER
+            </button>`;
+        } else if (f.status === "OTTER Engine Active") {
+          actionBtnHtml += `
+            <span style="font-size: 11px; color: #10B981; font-weight: 600;">
+              ✓ OTTER Multi-Stream Engine Active
+            </span>`;
+        }
+        if (destPathStr) {
+          actionBtnHtml += `
+            <button class="btn btn-sm open-dest-btn" data-path="${encodeURIComponent(destPathStr)}" style="background: #F3F4F6; color: #374151; border: 1px solid #D1D5DB; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-size: 11px;">
+              📂 Show in Folder
+            </button>`;
+        }
+        actionBtnHtml += `</div>`;
 
         itemEl.innerHTML = `
           <div class="file-title-row">
             <span class="file-name" title="${f.filename}">${f.filename}</span>
             <span class="file-status-badge">${f.status}</span>
           </div>
+          <div class="file-evidence-row" style="margin-top: 4px; font-weight: 500; color: #1F2937;">
+            <span>Transfer: ${downloadedStr} / ${totalStr}${pctStr}</span>
+            <span>•</span>
+            <span style="color: #2563EB; font-weight: 600;">Speed: ${speedStr}</span>
+            <span>•</span>
+            <span>Owner: ${ownershipStr}</span>
+          </div>
           <div class="file-evidence-row">
             ${sourceHtml}
             <span>•</span>
-            <span>${f.total_bytes ? formatBytes(f.total_bytes) : 'Estimating size...'}</span>
+            <span title="${destPathStr}">Location: ${destPathStr}${freeSpaceStr}</span>
           </div>
           <div class="file-evidence-row" style="color: #6B7280; font-size: 11px;">
             <span>Evidence: ${f.detection_evidence}</span>
@@ -826,15 +863,24 @@ function openActivityDetail(item) {
           e.stopPropagation();
           const targetUrl = decodeURIComponent(btn.getAttribute("data-url"));
           const targetFile = decodeURIComponent(btn.getAttribute("data-filename"));
+          const targetDest = decodeURIComponent(btn.getAttribute("data-dest") || "") || currentState.settings.default_download_dir;
           sendIpc("start_download", {
             url: targetUrl,
             filename: targetFile,
-            destination: "D:\\OTTER_CHROME_BENCHMARK",
+            destination: targetDest,
             connections: 16
           });
           btn.textContent = "✓ Handed off to OTTER";
           btn.disabled = true;
           btn.style.background = "#10B981";
+        });
+      });
+
+      filesContainer.querySelectorAll(".open-dest-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const p = decodeURIComponent(btn.getAttribute("data-path"));
+          sendIpc("open_path", { path: p });
         });
       });
     }
