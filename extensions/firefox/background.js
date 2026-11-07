@@ -1,5 +1,5 @@
-// OTTER v0.1.0 — Chrome Integration Background Service Worker
-// Manages real-time download interception, capability discovery, and safe handoff to the Rust engine.
+// OTTER v0.1.0 — Browser Integration Background Service Worker
+// Manages real-time download interception, capability discovery, and automatic multi-stream handoff.
 
 const OTTER_BRIDGE_URL = "http://127.0.0.1:45771";
 let isBridgeConnected = false;
@@ -56,94 +56,98 @@ function sanitizeUrlForAudit(rawUrl) {
 
 // Check and automatically accelerate any existing in-progress downloads
 async function scanAndAccelerateActiveDownloads() {
-  if (!isBridgeConnected || !autoHandoffEnabled) return;
+  if (!isBridgeConnected) return;
   chrome.downloads.search({ state: "in_progress" }, (items) => {
     if (items) {
       for (const item of items) {
         if (!item.paused) {
-          handleBrowserDownload(item);
+          chrome.downloads.pause(item.id, () => {});
         }
+        handleBrowserDownload(item);
       }
     }
   });
 }
 
-// Handler for browser downloads
+// Handler for browser downloads - instantly pauses single stream & hands off to OTTER 16-worker multi-stream
 async function handleBrowserDownload(item) {
   if (!item || !item.url) return;
-  console.log("[OTTER Extension] Download initiated in Chrome:", item.id, item.filename, item.totalBytes);
+  console.log("[OTTER Extension] Download intercepted in Chrome:", item.id, item.filename, item.totalBytes);
 
-  const payload = {
-    id: item.id,
-    url: item.url,
-    final_url: item.finalUrl || item.url,
-    sanitized_url: sanitizeUrlForAudit(item.url),
-    filename: item.filename ? item.filename.split(/[\\/]/).pop() : "download",
-    target_path: item.filename || "",
-    mime_type: item.mime || "application/octet-stream",
-    total_bytes: item.totalBytes > 0 ? item.totalBytes : null,
-    received_bytes: item.bytesReceived || 0,
-    state: item.state || "in_progress",
-    referrer: item.referrer || "",
-    start_time: item.startTime || new Date().toISOString(),
-    auto_handoff_requested: autoHandoffEnabled
-  };
-
-  try {
-    const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/created`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+  // Instantly pause Chrome's single connection to avoid slow 1-stream download
+  if (!item.paused && item.state === "in_progress") {
+    chrome.downloads.pause(item.id, () => {
+      console.log("[OTTER Extension] Paused Chrome native stream:", item.id);
     });
+  }
 
-    if (res.ok) {
-      const response = await res.json();
-      console.log("[OTTER Extension] Bridge response:", response);
+  // Fetch latest download item details from Chrome
+  chrome.downloads.search({ id: item.id }, async (results) => {
+    let resolvedItem = (results && results.length > 0) ? results[0] : item;
 
-      // Safe Handoff Protocol:
-      // If OTTER confirms eligibility and requests takeover:
-      // 1. Chrome download is paused to prevent duplicate bandwidth consumption.
-      // 2. OTTER Multi-Stream Engine (16 workers) takes over the transfer.
-      if (response.handoff === "PAUSE_AND_TAKEOVER") {
-        chrome.downloads.pause(item.id, () => {
-          console.log("[OTTER Extension] Successfully paused Chrome download for OTTER handoff:", item.id);
-        });
-      } else if (response.handoff === "CANCEL_DUPLICATE") {
-        chrome.downloads.cancel(item.id, () => {
-          console.log("[OTTER Extension] Successfully canceled Chrome download; OTTER engine assumed full control:", item.id);
-        });
+    // If finalUrl or filename is not yet populated, wait briefly and re-query
+    if (!resolvedItem.finalUrl || !resolvedItem.filename || resolvedItem.filename === "download") {
+      await new Promise(r => setTimeout(r, 350));
+      const secondCheck = await new Promise(r => chrome.downloads.search({ id: item.id }, r));
+      if (secondCheck && secondCheck.length > 0) {
+        resolvedItem = secondCheck[0];
       }
     }
-  } catch (e) {
-    console.warn("[OTTER Extension] Could not contact OTTER Bridge:", e.message);
-  }
+
+    const payload = {
+      id: resolvedItem.id,
+      url: resolvedItem.url,
+      final_url: resolvedItem.finalUrl || resolvedItem.url,
+      sanitized_url: sanitizeUrlForAudit(resolvedItem.url),
+      filename: resolvedItem.filename ? resolvedItem.filename.split(/[\\/]/).pop() : "download",
+      target_path: resolvedItem.filename || "",
+      mime_type: resolvedItem.mime || "application/octet-stream",
+      total_bytes: resolvedItem.totalBytes > 0 ? resolvedItem.totalBytes : null,
+      received_bytes: resolvedItem.bytesReceived || 0,
+      state: resolvedItem.state || "in_progress",
+      referrer: resolvedItem.referrer || "",
+      start_time: resolvedItem.startTime || new Date().toISOString(),
+      auto_handoff_requested: true
+    };
+
+    try {
+      const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/created`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const response = await res.json();
+        console.log("[OTTER Extension] OTTER multi-stream takeover initiated:", response);
+        // Ensure Chrome single connection remains paused
+        chrome.downloads.pause(resolvedItem.id, () => {});
+      }
+    } catch (e) {
+      console.warn("[OTTER Extension] Could not contact OTTER Bridge:", e.message);
+    }
+  });
 }
 
-// Listen for download creation
+// Listen for download creation - immediately pause Chrome and hand off to OTTER
 chrome.downloads.onCreated.addListener((item) => {
+  chrome.downloads.pause(item.id, () => {});
   handleBrowserDownload(item);
 });
 
-// Listen for download state changes
+// Listen for download state changes - ensure single stream stays paused and OTTER is updated
 chrome.downloads.onChanged.addListener(async (delta) => {
-  const payload = {
-    id: delta.id,
-    state: delta.state ? delta.state.current : undefined,
-    paused: delta.paused ? delta.paused.current : undefined,
-    error: delta.error ? delta.error.current : undefined,
-    total_bytes: delta.totalBytes ? delta.totalBytes.current : undefined,
-    filename: delta.filename ? delta.filename.current.split(/[\\/]/).pop() : undefined
-  };
-
-  try {
-    await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/changed`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-  } catch (e) {
-    // Ignore offline errors during background sync
-  }
+  chrome.downloads.search({ id: delta.id }, (items) => {
+    if (items && items.length > 0) {
+      const item = items[0];
+      if (item.state === "in_progress") {
+        if (!item.paused) {
+          chrome.downloads.pause(item.id, () => {});
+        }
+        handleBrowserDownload(item);
+      }
+    }
+  });
 });
 
 // Listen for messages from popup or options page
@@ -155,7 +159,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     chrome.storage.local.set({ autoHandoff: autoHandoffEnabled });
     sendResponse({ success: true, autoHandoff: autoHandoffEnabled });
   } else if (msg.action === "FORCE_HANDOFF") {
-    // Trigger manual handoff for a specific download ID
     chrome.downloads.pause(msg.downloadId, async () => {
       try {
         const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/handoff`, {

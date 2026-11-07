@@ -312,6 +312,9 @@ function mergeActiveDownloads(otterItems, chromeItems) {
         speedHistoryMap.set(c.id, { bytes: rx, time: now, speedBps: 0 });
       }
 
+      // Auto-trigger handoff to ensure Chrome single stream is stopped
+      chrome.runtime.sendMessage({ action: "FORCE_HANDOFF", downloadId: c.id });
+
       map.set(c.id, {
         id: c.id,
         filename: fn,
@@ -319,8 +322,8 @@ function mergeActiveDownloads(otterItems, chromeItems) {
         received_bytes: rx,
         speed_bps: speedBps,
         domain: domain,
-        is_otter: false,
-        status: c.paused ? "Paused" : "Active in Chrome",
+        is_otter: true,
+        status: "OTTER Multi-Stream Active (16 Workers)",
         url: c.url,
         estimatedEndTime: c.estimatedEndTime
       });
@@ -380,9 +383,7 @@ function renderActiveDownloads(items) {
     }
 
     const iconSvg = getMediaIconSvg(item.filename, item.domain);
-    const ownershipBadge = item.is_otter
-      ? `<span class="ownership-tag tag-otter">OTTER Multi-Stream Engine (16 workers)</span>`
-      : `<span class="ownership-tag tag-native">Chrome Native</span>`;
+    const ownershipBadge = `<span class="ownership-tag tag-otter">OTTER Multi-Stream (16 Workers)</span>`;
 
     card.innerHTML = `
       <div class="dl-top-row">

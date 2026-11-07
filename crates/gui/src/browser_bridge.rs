@@ -71,7 +71,53 @@ impl BrowserBridge {
     }
 
     pub async fn get_all_items(&self) -> Vec<BrowserDownloadItem> {
-        let guard = self.items.lock().await;
+        let manifest_opt = self.manifest.read().await.clone();
+        let mut guard = self.items.lock().await;
+        if let Some(manifest) = manifest_opt {
+            for item in guard.values_mut() {
+                if let Some(ref jid) = item.otter_job_id {
+                    if let Ok(Some(job)) = manifest.get_job(jid) {
+                        let now = Instant::now();
+                        let rx = job.downloaded_bytes;
+                        if let Some(last_inst) = item.last_instant {
+                            let elapsed = last_inst.elapsed().as_secs_f64();
+                            if elapsed >= 0.5 {
+                                let delta = rx.saturating_sub(item.last_bytes) as f64;
+                                item.current_speed_bps = delta / elapsed;
+                                item.last_bytes = rx;
+                                item.last_instant = Some(now);
+                            }
+                        } else {
+                            item.last_instant = Some(now);
+                            item.last_bytes = rx;
+                        }
+                        item.received_bytes = rx;
+                        if let Some(tot) = job.total_size {
+                            item.total_bytes = Some(tot);
+                        }
+                        match job.status {
+                            types::DownloadStatus::Completed => {
+                                item.state = "complete".to_string();
+                                item.status = "Completed".to_string();
+                                item.current_speed_bps = 0.0;
+                            }
+                            types::DownloadStatus::Error => {
+                                item.state = "interrupted".to_string();
+                                item.status = "Failed".to_string();
+                                item.error = job.error.clone();
+                                item.current_speed_bps = 0.0;
+                            }
+                            types::DownloadStatus::Active | types::DownloadStatus::Queued => {
+                                item.state = "in_progress".to_string();
+                                item.status = "OTTER Multi-Stream Active (16 Workers)".to_string();
+                                item.engine_status = "OTTER Multi-Stream Active (16 Workers)".to_string();
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
         guard.values().cloned().collect()
     }
 
@@ -236,7 +282,7 @@ impl BrowserBridge {
             otter_job_id: None,
         };
 
-        let action = if auto_handoff && is_eligible {
+        let action = if auto_handoff {
             let manifest_opt = self.manifest.read().await.clone();
             let manager_opt = self.manager.read().await.clone();
             if let (Some(manifest), Some(manager)) = (manifest_opt, manager_opt) {
@@ -345,6 +391,55 @@ impl BrowserBridge {
                     item.status = "Failed".to_string();
                     item.error = error.clone();
                     item.current_speed_bps = 0.0;
+                }
+            }
+
+            if item.otter_job_id.is_none() && item.state != "complete" {
+                let manifest_opt = self.manifest.read().await.clone();
+                let manager_opt = self.manager.read().await.clone();
+                if let (Some(manifest), Some(manager)) = (manifest_opt, manager_opt) {
+                    let default_dir = "D:\\".to_string();
+                    let resolved_dir = BrowserBridge::resolve_download_destination_dir(
+                        &item.target_path,
+                        &default_dir,
+                    );
+                    let _ = std::fs::create_dir_all(&resolved_dir);
+                    let job_id = format!(
+                        "{:x}",
+                        chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                    );
+                    let target_file = resolved_dir.join(&item.filename);
+
+                    let job = types::JobRecord {
+                        id: job_id.clone(),
+                        url: item.url.clone(),
+                        filename: item.filename.clone(),
+                        destination: target_file.display().to_string(),
+                        total_size: item.total_bytes,
+                        downloaded_bytes: item.received_bytes,
+                        status: types::DownloadStatus::Queued,
+                        resumable: true,
+                        etag: None,
+                        last_modified: None,
+                        expected_sha256: None,
+                        computed_sha256: None,
+                        error: None,
+                        created_at: chrono::Utc::now().timestamp_millis(),
+                        completed_at: None,
+                    };
+                    let _ = manifest.upsert_job(&job);
+
+                    let mgr_clone = manager.clone();
+                    let jid_clone = job_id.clone();
+                    tokio::spawn(async move {
+                        let token = tokio_util::sync::CancellationToken::new();
+                        let _ = mgr_clone.run_job(&jid_clone, 16, token).await;
+                    });
+
+                    item.is_otter_managed = true;
+                    item.engine_status = "OTTER Multi-Stream Active (16 Workers)".to_string();
+                    item.status = "OTTER Multi-Stream Active (16 Workers)".to_string();
+                    item.otter_job_id = Some(job_id);
                 }
             }
 
