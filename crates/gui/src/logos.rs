@@ -2,14 +2,19 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_ENGINE;
 use std::sync::OnceLock;
 
-pub const LOGO_HF_BYTES: &[u8] = include_bytes!("../../../logos/c3635b59-a3d2-444a-b636-a9d0061dcdde.png");
+pub const LOGO_HF_BYTES: &[u8] =
+    include_bytes!("../../../logos/c3635b59-a3d2-444a-b636-a9d0061dcdde.png");
 pub const LOGO_EPIC_BYTES: &[u8] = include_bytes!("../../../logos/Epic-Games-logo.png");
 pub const LOGO_GITHUB_BYTES: &[u8] = include_bytes!("../../../logos/github_logo_icon_145252.png");
-pub const LOGO_CHROME_BYTES: &[u8] = include_bytes!("../../../logos/google-chrome-web-browser-google-logo-google-i-o-google.jpg");
+pub const LOGO_CHROME_BYTES: &[u8] =
+    include_bytes!("../../../logos/google-chrome-web-browser-google-logo-google-i-o-google.jpg");
 pub const LOGO_STEAM_BYTES: &[u8] = include_bytes!("../../../logos/images (1).jpeg");
 pub const LOGO_INSTAGRAM_BYTES: &[u8] = include_bytes!("../../../logos/images (3).png");
-pub const LOGO_PINTEREST_BYTES: &[u8] = include_bytes!("../../../logos/pinterest-logo-pinterest-transparent-free-png.webp");
-pub const LOGO_FOLDER_BYTES: &[u8] = include_bytes!("../../../logos/pngtree-transparent-file-folder-icon-for-storage-concept-design-organize-object-vector-png-image_41394742.jpg");
+pub const LOGO_PINTEREST_BYTES: &[u8] =
+    include_bytes!("../../../logos/pinterest-logo-pinterest-transparent-free-png.webp");
+pub const LOGO_FOLDER_BYTES: &[u8] = include_bytes!(
+    "../../../logos/pngtree-transparent-file-folder-icon-for-storage-concept-design-organize-object-vector-png-image_41394742.jpg"
+);
 
 #[derive(Debug, Clone)]
 pub struct AppLogos {
@@ -26,17 +31,39 @@ pub struct AppLogos {
 static LOGOS: OnceLock<AppLogos> = OnceLock::new();
 
 pub fn get_logos() -> &'static AppLogos {
-    LOGOS.get_or_init(|| {
-        AppLogos {
-            hf: format!("data:image/png;base64,{}", BASE64_ENGINE.encode(LOGO_HF_BYTES)),
-            epic: format!("data:image/png;base64,{}", BASE64_ENGINE.encode(LOGO_EPIC_BYTES)),
-            github: format!("data:image/png;base64,{}", BASE64_ENGINE.encode(LOGO_GITHUB_BYTES)),
-            chrome: format!("data:image/jpeg;base64,{}", BASE64_ENGINE.encode(LOGO_CHROME_BYTES)),
-            steam: format!("data:image/jpeg;base64,{}", BASE64_ENGINE.encode(LOGO_STEAM_BYTES)),
-            instagram: format!("data:image/png;base64,{}", BASE64_ENGINE.encode(LOGO_INSTAGRAM_BYTES)),
-            pinterest: format!("data:image/webp;base64,{}", BASE64_ENGINE.encode(LOGO_PINTEREST_BYTES)),
-            folder: format!("data:image/jpeg;base64,{}", BASE64_ENGINE.encode(LOGO_FOLDER_BYTES)),
-        }
+    LOGOS.get_or_init(|| AppLogos {
+        hf: format!(
+            "data:image/png;base64,{}",
+            BASE64_ENGINE.encode(LOGO_HF_BYTES)
+        ),
+        epic: format!(
+            "data:image/png;base64,{}",
+            BASE64_ENGINE.encode(LOGO_EPIC_BYTES)
+        ),
+        github: format!(
+            "data:image/png;base64,{}",
+            BASE64_ENGINE.encode(LOGO_GITHUB_BYTES)
+        ),
+        chrome: format!(
+            "data:image/jpeg;base64,{}",
+            BASE64_ENGINE.encode(LOGO_CHROME_BYTES)
+        ),
+        steam: format!(
+            "data:image/jpeg;base64,{}",
+            BASE64_ENGINE.encode(LOGO_STEAM_BYTES)
+        ),
+        instagram: format!(
+            "data:image/png;base64,{}",
+            BASE64_ENGINE.encode(LOGO_INSTAGRAM_BYTES)
+        ),
+        pinterest: format!(
+            "data:image/webp;base64,{}",
+            BASE64_ENGINE.encode(LOGO_PINTEREST_BYTES)
+        ),
+        folder: format!(
+            "data:image/jpeg;base64,{}",
+            BASE64_ENGINE.encode(LOGO_FOLDER_BYTES)
+        ),
     })
 }
 
@@ -61,5 +88,8 @@ pub fn get_logo_img_tag(app_id_or_domain: &str) -> String {
         (&logos.folder, "Folder")
     };
 
-    format!(r#"<img src="{}" alt="{}" class="brand-img-icon" />"#, src, alt)
+    format!(
+        r#"<img src="{}" alt="{}" class="brand-img-icon" />"#,
+        src, alt
+    )
 }

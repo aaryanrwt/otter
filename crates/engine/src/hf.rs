@@ -2,14 +2,27 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HfLfsPointer {
+    pub oid: String,
+    pub size: u64,
+    #[serde(rename = "pointerSize")]
+    pub pointer_size: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HfRepoInfo {
     pub id: String,
     pub author: Option<String>,
     pub sha: Option<String>,
+    #[serde(default)]
     pub private: bool,
+    #[serde(default)]
+    pub gated: serde_json::Value,
     pub downloads: Option<u64>,
     pub likes: Option<u64>,
+    #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
     pub siblings: Vec<HfFileSibling>,
 }
 
@@ -17,6 +30,8 @@ pub struct HfRepoInfo {
 pub struct HfFileSibling {
     pub rfilename: String,
     pub size: Option<u64>,
+    pub blob_id: Option<String>,
+    pub lfs: Option<HfLfsPointer>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,13 +67,13 @@ impl HfClient {
 
         let client = reqwest::Client::builder()
             .default_headers(headers)
-            .timeout(std::time::Duration::from_secs(15))
+            .timeout(std::time::Duration::from_secs(20))
             .build()?;
 
         Ok(Self { client, token })
     }
 
-    /// Query Hugging Face Model metadata and file tree
+    /// Query Hugging Face Model metadata and file tree with `?blobs=true` for exact sizes and LFS SHA-256 digests
     pub async fn get_model_info(
         &self,
         model_id: &str,
@@ -66,13 +81,23 @@ impl HfClient {
     ) -> Result<HfRepoInfo> {
         let rev = revision.unwrap_or("main");
         let url = format!(
-            "https://huggingface.co/api/models/{}?revision={}",
+            "https://huggingface.co/api/models/{}?revision={}&blobs=true",
             model_id, rev
         );
         let resp =
             self.client.get(&url).send().await.with_context(|| {
                 format!("Failed to reach Hugging Face API for model: {}", model_id)
             })?;
+
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED
+            || resp.status() == reqwest::StatusCode::FORBIDDEN
+        {
+            bail!(
+                "Authentication required or gated Hugging Face model (HTTP {}): '{}'. Set HF_TOKEN to access.",
+                resp.status(),
+                model_id
+            );
+        }
 
         if !resp.status().is_success() {
             bail!(
@@ -88,7 +113,7 @@ impl HfClient {
         Ok(info)
     }
 
-    /// Query Hugging Face Dataset metadata and file tree
+    /// Query Hugging Face Dataset metadata and file tree with `?blobs=true` for exact sizes and LFS SHA-256 digests
     pub async fn get_dataset_info(
         &self,
         dataset_id: &str,
@@ -96,7 +121,7 @@ impl HfClient {
     ) -> Result<HfRepoInfo> {
         let rev = revision.unwrap_or("main");
         let url = format!(
-            "https://huggingface.co/api/datasets/{}?revision={}",
+            "https://huggingface.co/api/datasets/{}?revision={}&blobs=true",
             dataset_id, rev
         );
         let resp = self.client.get(&url).send().await.with_context(|| {
@@ -105,6 +130,16 @@ impl HfClient {
                 dataset_id
             )
         })?;
+
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED
+            || resp.status() == reqwest::StatusCode::FORBIDDEN
+        {
+            bail!(
+                "Authentication required or gated Hugging Face dataset (HTTP {}): '{}'. Set HF_TOKEN to access.",
+                resp.status(),
+                dataset_id
+            );
+        }
 
         if !resp.status().is_success() {
             bail!(
@@ -120,7 +155,7 @@ impl HfClient {
         Ok(info)
     }
 
-    /// Build resolved download items for a model repo
+    /// Build resolved download items for a model repo, including LFS size and SHA-256 digest
     pub fn build_model_download_list(
         &self,
         model_id: &str,
@@ -149,18 +184,23 @@ impl HfClient {
                 model_id, rev, name
             );
 
+            let expected_size = sibling
+                .size
+                .or_else(|| sibling.lfs.as_ref().map(|l| l.size));
+            let expected_sha256 = sibling.lfs.as_ref().map(|l| l.oid.clone());
+
             items.push(HfResolvedDownloadItem {
                 rfilename: name.clone(),
                 download_url,
-                expected_size: sibling.size,
-                expected_sha256: None,
+                expected_size,
+                expected_sha256,
             });
         }
 
         items
     }
 
-    /// Build resolved download items for a dataset repo
+    /// Build resolved download items for a dataset repo, including LFS size and SHA-256 digest
     pub fn build_dataset_download_list(
         &self,
         dataset_id: &str,
@@ -183,12 +223,13 @@ impl HfClient {
                 continue;
             }
 
-            // Only include dataset data formats: parquet, jsonl, arrow, csv
             if !name.ends_with(".parquet")
                 && !name.ends_with(".jsonl")
                 && !name.ends_with(".arrow")
                 && !name.ends_with(".csv")
                 && !name.ends_with(".json")
+                && !name.ends_with(".zip")
+                && !name.ends_with(".tar.gz")
             {
                 continue;
             }
@@ -198,11 +239,16 @@ impl HfClient {
                 dataset_id, rev, name
             );
 
+            let expected_size = sibling
+                .size
+                .or_else(|| sibling.lfs.as_ref().map(|l| l.size));
+            let expected_sha256 = sibling.lfs.as_ref().map(|l| l.oid.clone());
+
             items.push(HfResolvedDownloadItem {
                 rfilename: name.clone(),
                 download_url,
-                expected_size: sibling.size,
-                expected_sha256: None,
+                expected_size,
+                expected_sha256,
             });
         }
 

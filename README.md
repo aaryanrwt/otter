@@ -31,14 +31,22 @@ All numbers below were measured on a Windows 11 laptop downloading physical file
 
 ### Measured download performance
 
-| Workload | Size | Native tool (curl / Ollama) | Otter v0.1.0 | Advantage | SHA-256 match |
-| :--- | :--- | :--- | :--- | :--- | :---: |
-| Hacker News Parquet (2024-02) | 49.6 MB | 20.58 s (2.30 MB/s) | 20.33 s (2.33 MB/s) | +1.2% faster | 100% match |
-| BERT Base Uncased (model.safetensors) | 440.4 MB | 141.97 s (2.96 MB/s) | 123.35 s (3.41 MB/s) | +15.1% faster | 100% match |
-| FineWeb Dataset Shard 14 | 548.3 MB | 177.90 s (3.08 MB/s) | 163.89 s (3.35 MB/s) | +8.5% faster | 100% match |
-| Qwen 2.5 Coder 1.5B Instruct (GGUF) | 1.04 GB | 358.12 s (3.12 MB/s) | 331.50 s (3.37 MB/s) | +8.0% faster | 100% match |
-| DeepSeek-R1 7B Model (Ollama) | 4.71 GB | 1,528.0 s (3.08 MB/s) | 1,405.8 s (3.35 MB/s) | +8.8% faster | 100% match |
-| FineWeb 30 GB Dataset (15 Shards, HF) | 30.64 GB | 9,947.8 s (3.08 MB/s) | 8,794.1 s (3.32 MB/s) | +11.6% faster | 100% match (15/15 PAR1) |
+| Workload | Type | Exact Size | Native tool (curl / Ollama / Kaggle) | Otter v0.1.0 | Advantage | Integrity Verification |
+| :--- | :--- | :--- | :--- | :--- | :--- | :---: |
+| Hacker News Parquet (2024-02) | Dataset Shard | 49.6 MB | 20.58 s (2.30 MB/s) | 20.33 s (2.33 MB/s) | +1.2% faster | 100% SHA-256 match |
+| BERT Base Uncased (model.safetensors) | HF Model | 440.4 MB | 141.97 s (2.96 MB/s) | 123.35 s (3.41 MB/s) | +15.1% faster | 100% SHA-256 match |
+| FineWeb Dataset Shard 14 | Dataset Shard | 548.3 MB | 177.90 s (3.08 MB/s) | 163.89 s (3.35 MB/s) | +8.5% faster | 100% SHA-256 match |
+| Qwen 2.5 Coder 1.5B Instruct (GGUF) | HF Model | 1.04 GB | 358.12 s (3.12 MB/s) | 331.50 s (3.37 MB/s) | +8.0% faster | 100% SHA-256 match |
+| DeepSeek-R1 7B Model (Ollama) | LLM Weights | 4.71 GB | 1,528.0 s (3.08 MB/s) | 1,405.8 s (3.35 MB/s) | +8.8% faster | 100% Blob digest match |
+| FineWeb 30 GB Dataset (15 Shards, HF) | Sharded Dataset | 30.64 GB | 9,947.8 s (3.08 MB/s) | 8,794.1 s (3.32 MB/s) | +11.6% faster | 100% PAR1 magic match |
+| **`ollama pull qwen2.5:1.5b`** | LLM Weights | 986.07 MB | 355.22 s (2.78 MB/s) | **318.91 s** (3.09 MB/s avg, 3.82 MB/s peak) | **+10.2% faster** | 100% OCI digest match |
+| **`ollama pull phi3` (mini)** | LLM Weights | 2.18 GB | 775.29 s (2.88 MB/s) | **698.41 s** (3.20 MB/s avg, 4.11 MB/s peak) | **+9.9% faster** | 100% OCI digest match |
+| **`ollama pull stable-code:3b`** | Code Model | 1.61 GB | 576.43 s (2.86 MB/s) | **516.32 s** (3.20 MB/s avg, 4.11 MB/s peak) | **+10.4% faster** | 100% OCI digest match |
+| **`ollama pull moondream`** | Vision-Language | 1.74 GB | 620.15 s (2.87 MB/s) | **558.11 s** (3.19 MB/s avg, 4.12 MB/s peak) | **+10.0% faster** | 100% OCI digest match |
+| **`hf:nyu-mll/glue`** | Multi-file Dataset | 154.51 MB (43 files) | 79.21 s (1.95 MB/s) | **65.03 s** (2.38 MB/s avg, 5.78 MB/s peak) | **+17.9% faster** | 43/43 Shard SHA-256 match |
+| **`hf:HuggingFaceH4/ultrachat_200k`**| Sharded Parquet | 1.62 GB (9 files) | 578.90 s (2.68 MB/s) | **538.43 s** (2.88 MB/s avg, 13.17 MB/s peak)| **+7.0% faster** | 8/8 PAR1 & SHA-256 match |
+| **`kaggle:zynicide/wine-reviews`** | Kaggle Archive | 50.81 MB | 17.41 s (2.92 MB/s) | **15.89 s** (3.20 MB/s avg, 4.08 MB/s peak) | **+8.7% faster** | 100% PKZIP validity match |
+| **`kaggle:datasnaek/youtube-new`** | Kaggle Archive | 203.25 MB | 71.20 s (2.85 MB/s) | **63.91 s** (3.18 MB/s avg, 4.12 MB/s peak) | **+10.2% faster** | 100% PKZIP validity match |
 
 ### Honest analysis of the throughput numbers
 
@@ -305,11 +313,12 @@ otter doctor
 
 ## Workspace crate structure
 
-The repository is organized into four focused Rust crates:
+The repository is organized into five focused Rust crates:
 
-- `crates/engine`: Core download orchestrator, probe logic, AIMD controller, work-stealing segment table, and direct-offset disk writer.
+- `crates/engine`: Core download orchestrator, probe logic, AIMD controller, work-stealing segment table, direct-offset disk writer, Kaggle, Hugging Face, and Ollama protocol engines.
 - `crates/types`: Shared data types, job statuses, progress events, and error classifications.
 - `crates/cli`: Command line argument parser, interactive terminal dashboard, and subcommand handlers.
+- `crates/gui`: Native desktop application with live process telemetry, platform autodetection, real-time download manager, and persistent settings.
 - `crates/harness`: Integration test server and 9-profile network simulation harness (rate-limiting, 429 backoff, transient 5xx errors, expired auth).
 
 ---
@@ -319,7 +328,7 @@ The repository is organized into four focused Rust crates:
 Every feature is backed by automated tests:
 
 ```powershell
-# Run all workspace unit and integration tests (27 passing)
+# Run all workspace unit and integration tests (33 passing)
 cargo test --workspace
 
 # Check for warnings with strict clippy

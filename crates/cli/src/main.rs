@@ -2443,9 +2443,7 @@ pub fn print_welcome_banner() {
     println!(
         "  {} {}",
         purple_fg("▌").bold(),
-        "Downloads that finish, provably."
-            .bold()
-            .white()
+        "Downloads that finish, provably.".bold().white()
     );
     println!(
         "    {}",
@@ -2864,8 +2862,6 @@ fn run_interactive_menu_selection(manager: &DownloadManager) -> Result<Option<ch
     } else {
         (FRAME_LINES * 2 + 4) as u16
     };
-
-
 
     let choice = loop {
         if let Event::Key(key) = event::read()?

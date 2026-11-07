@@ -1,6 +1,6 @@
 use anyhow::Result;
-use engine::orchestrator::DownloadManager;
 use engine::manifest::ManifestStore;
+use engine::orchestrator::DownloadManager;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -10,8 +10,12 @@ use types::ProgressSnapshot;
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 
-fn default_true() -> bool { true }
-fn default_16() -> usize { 16 }
+fn default_true() -> bool {
+    true
+}
+fn default_16() -> usize {
+    16
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuiSettings {
@@ -109,7 +113,9 @@ impl GuiSettings {
     fn settings_path() -> PathBuf {
         let local_app_data = std::env::var("LOCALAPPDATA")
             .unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Local".to_string());
-        PathBuf::from(local_app_data).join("otter").join("gui_settings.json")
+        PathBuf::from(local_app_data)
+            .join("otter")
+            .join("gui_settings.json")
     }
 }
 
@@ -120,12 +126,28 @@ pub fn update_windows_autostart(enable: bool) -> Result<()> {
             let exe_str = exe_path.to_string_lossy().to_string();
             if enable {
                 let _ = std::process::Command::new("reg")
-                    .args(&["add", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Otter", "/t", "REG_SZ", "/d", &format!("\"{}\"", exe_str), "/f"])
+                    .args(&[
+                        "add",
+                        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                        "/v",
+                        "Otter",
+                        "/t",
+                        "REG_SZ",
+                        "/d",
+                        &format!("\"{}\"", exe_str),
+                        "/f",
+                    ])
                     .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .output();
             } else {
                 let _ = std::process::Command::new("reg")
-                    .args(&["delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Otter", "/f"])
+                    .args(&[
+                        "delete",
+                        "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+                        "/v",
+                        "Otter",
+                        "/f",
+                    ])
                     .creation_flags(0x08000000) // CREATE_NO_WINDOW
                     .output();
             }
@@ -158,7 +180,8 @@ pub struct AppState {
     pub manager: Arc<DownloadManager>,
     pub manifest: Arc<ManifestStore>,
     pub active_snapshots: Arc<Mutex<std::collections::HashMap<String, ProgressSnapshot>>>,
-    pub cancellation_tokens: Arc<Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>>,
+    pub cancellation_tokens:
+        Arc<Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>>,
     pub thumbnails: Arc<Mutex<std::collections::HashMap<String, String>>>,
     pub settings: Arc<Mutex<GuiSettings>>,
 }
@@ -166,7 +189,10 @@ pub struct AppState {
 impl AppState {
     pub fn new() -> Result<Self> {
         let manifest = Arc::new(ManifestStore::open_default()?);
-        let manager = Arc::new(DownloadManager::with_max_host_connections(manifest.clone(), 64)?);
+        let manager = Arc::new(DownloadManager::with_max_host_connections(
+            manifest.clone(),
+            64,
+        )?);
         let settings = Arc::new(Mutex::new(GuiSettings::load()));
 
         Ok(Self {

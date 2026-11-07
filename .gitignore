@@ -16,6 +16,7 @@ otter cli/
 # Local scratch and test scripts
 *.txt
 *.py
+!crates/gui/scripts/*.py
 
 # System and OS files
 .DS_Store

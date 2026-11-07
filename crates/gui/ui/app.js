@@ -221,11 +221,18 @@ function setupModal() {
     const selectedId = e.target.value;
     const fnInput = document.getElementById("det-filename-input");
     if (!fnInput || !currentDetectedResult) return;
+    if (selectedId.startsWith("file:")) {
+      fnInput.value = selectedId.slice(5).split("/").pop();
+      return;
+    }
+    if (currentDetectedResult.is_ai_workload) {
+      return;
+    }
     let baseName = fnInput.value.replace(/\.(mp4|mp3|m4a|webm|mkv|zip|bin)$/i, "");
     if (selectedId.startsWith("audio_")) {
       const ext = selectedId.includes("mp3") ? ".mp3" : ".m4a";
       fnInput.value = baseName + ext;
-    } else {
+    } else if (selectedId.startsWith("video_")) {
       fnInput.value = baseName + ".mp4";
     }
   });
@@ -242,8 +249,8 @@ function setupModal() {
       return;
     }
 
-    const isMediaCandidate = /youtube\.com|youtu\.be|instagram\.com|pinterest\.com|pin\.it|tiktok\.com|twitter\.com|x\.com|vimeo\.com|soundcloud\.com|dailymotion\.com|twitch\.tv|reddit\.com|facebook\.com/i.test(val);
-    if (isMediaCandidate) {
+    const isMediaOrAiCandidate = /youtube\.com|youtu\.be|instagram\.com|pinterest\.com|pin\.it|tiktok\.com|twitter\.com|x\.com|vimeo\.com|soundcloud\.com|dailymotion\.com|twitch\.tv|reddit\.com|facebook\.com|huggingface\.co|^hf:|ollama\.com|^ollama[:\s]|kaggle\.com|^kaggle[:\s]/i.test(val);
+    if (isMediaOrAiCandidate) {
       document.getElementById("det-probing-indicator").style.display = "flex";
       document.getElementById("detection-result-card").style.display = "none";
       if (startBtn) {
@@ -262,15 +269,16 @@ function setupModal() {
 
     let res = currentDetectedResult;
     const isMediaCandidate = /youtube\.com|youtu\.be|instagram\.com|pinterest\.com|pin\.it|tiktok\.com|twitter\.com|x\.com|vimeo\.com|soundcloud\.com|dailymotion\.com|twitch\.tv|reddit\.com|facebook\.com/i.test(rawVal);
+    const isAiCandidate = /huggingface\.co|^hf:|ollama\.com|^ollama[:\s]|kaggle\.com|^kaggle[:\s]/i.test(rawVal);
 
     if (!res || !res.is_valid) {
       res = {
         raw_url: rawVal,
         url: rawVal,
         is_valid: true,
-        is_media: isMediaCandidate,
+        is_media: isMediaCandidate || isAiCandidate,
         suggested_filename: isMediaCandidate ? "media_download.mp4" : "download.bin",
-        default_quality_id: "video_best",
+        default_quality_id: isAiCandidate ? "repo_all" : "video_best",
       };
     }
 
@@ -284,7 +292,7 @@ function setupModal() {
       destination: finalDest,
       connections: 0, // 0 = Auto Dynamic Concurrency Governor
       quality_id: selectedQuality,
-      is_media: Boolean(res.is_media || isMediaCandidate),
+      is_media: Boolean(res.is_media || res.is_ai_workload || isMediaCandidate || isAiCandidate),
       thumbnail: res.thumbnail || ""
     });
 

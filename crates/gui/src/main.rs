@@ -16,7 +16,7 @@ use tao::event::{Event, StartCause, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 use tao::window::WindowBuilder;
 use wry::http::{Response, header::CONTENT_TYPE};
-use wry::{WebView, WebViewBuilder, WebContext};
+use wry::{WebContext, WebView, WebViewBuilder};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -25,10 +25,14 @@ const INDEX_HTML: &str = include_str!("../ui/index.html");
 const STYLE_CSS: &str = include_str!("../ui/style.css");
 const APP_JS: &str = include_str!("../ui/app.js");
 
-const MASCOT_FLYING: &[u8] = include_bytes!("../../../images/Flying Otter Mascot with Flowing Scarf.png");
-const MASCOT_FOCUSED: &[u8] = include_bytes!("../../../images/Focused Otter with Laptop and Coffee.png");
-const MASCOT_CHEERFUL: &[u8] = include_bytes!("../../../images/Cheerful Otter Popping Out of Pink Box.png");
-const MASCOT_SLEEPING: &[u8] = include_bytes!("../../../images/Sleeping Otter with Pink Paw Pillow.png");
+const MASCOT_FLYING: &[u8] =
+    include_bytes!("../../../images/Flying Otter Mascot with Flowing Scarf.png");
+const MASCOT_FOCUSED: &[u8] =
+    include_bytes!("../../../images/Focused Otter with Laptop and Coffee.png");
+const MASCOT_CHEERFUL: &[u8] =
+    include_bytes!("../../../images/Cheerful Otter Popping Out of Pink Box.png");
+const MASCOT_SLEEPING: &[u8] =
+    include_bytes!("../../../images/Sleeping Otter with Pink Paw Pillow.png");
 
 #[cfg(windows)]
 mod single_instance {
@@ -42,7 +46,11 @@ mod single_instance {
     const SW_RESTORE: i32 = 9;
 
     unsafe extern "system" {
-        fn CreateMutexW(lpMutexAttributes: *mut std::ffi::c_void, bInitialOwner: BOOL, lpName: *const u16) -> HANDLE;
+        fn CreateMutexW(
+            lpMutexAttributes: *mut std::ffi::c_void,
+            bInitialOwner: BOOL,
+            lpName: *const u16,
+        ) -> HANDLE;
         fn GetLastError() -> u32;
         fn FindWindowW(lpClassName: *const u16, lpWindowName: *const u16) -> HWND;
         fn ShowWindow(hWnd: HWND, nCmdShow: i32) -> BOOL;
@@ -56,13 +64,19 @@ mod single_instance {
 
     impl SingleInstanceGuard {
         pub fn acquire(name: &str) -> Option<Self> {
-            let wide_name: Vec<u16> = OsStr::new(name).encode_wide().chain(std::iter::once(0)).collect();
+            let wide_name: Vec<u16> = OsStr::new(name)
+                .encode_wide()
+                .chain(std::iter::once(0))
+                .collect();
             let handle = unsafe { CreateMutexW(std::ptr::null_mut(), 1, wide_name.as_ptr()) };
             if handle.is_null() {
                 return None;
             }
             if unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
-                let title: Vec<u16> = OsStr::new("Otter").encode_wide().chain(std::iter::once(0)).collect();
+                let title: Vec<u16> = OsStr::new("Otter")
+                    .encode_wide()
+                    .chain(std::iter::once(0))
+                    .collect();
                 let hwnd = unsafe { FindWindowW(std::ptr::null(), title.as_ptr()) };
                 if !hwnd.is_null() {
                     unsafe {
@@ -94,7 +108,9 @@ enum UserEvent {
 
 fn main() -> Result<()> {
     #[cfg(windows)]
-    let _instance_guard = match single_instance::SingleInstanceGuard::acquire("Local\\OtterUniversalDownloadManager_Mutex") {
+    let _instance_guard = match single_instance::SingleInstanceGuard::acquire(
+        "Local\\OtterUniversalDownloadManager_Mutex",
+    ) {
         Some(guard) => guard,
         None => {
             println!("Otter is already running. Existing window brought to focus.");
@@ -119,10 +135,22 @@ fn main() -> Result<()> {
         .build(&event_loop)?;
 
     // Inline mascot PNGs as base64 data URIs into HTML to guarantee 100% offline rendering without protocol issues
-    let flying_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_FLYING));
-    let focused_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_FOCUSED));
-    let cheerful_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_CHEERFUL));
-    let sleeping_b64 = format!("data:image/png;base64,{}", BASE64_ENGINE.encode(MASCOT_SLEEPING));
+    let flying_b64 = format!(
+        "data:image/png;base64,{}",
+        BASE64_ENGINE.encode(MASCOT_FLYING)
+    );
+    let focused_b64 = format!(
+        "data:image/png;base64,{}",
+        BASE64_ENGINE.encode(MASCOT_FOCUSED)
+    );
+    let cheerful_b64 = format!(
+        "data:image/png;base64,{}",
+        BASE64_ENGINE.encode(MASCOT_CHEERFUL)
+    );
+    let sleeping_b64 = format!(
+        "data:image/png;base64,{}",
+        BASE64_ENGINE.encode(MASCOT_SLEEPING)
+    );
 
     let app_logos = logos::get_logos();
     let logos_json = serde_json::json!({
@@ -135,7 +163,10 @@ fn main() -> Result<()> {
         "pinterest": app_logos.pinterest,
         "folder": app_logos.folder,
     });
-    let logos_script = format!("<script>window.OTTER_LOGOS = {};</script>", serde_json::to_string(&logos_json)?);
+    let logos_script = format!(
+        "<script>window.OTTER_LOGOS = {};</script>",
+        serde_json::to_string(&logos_json)?
+    );
 
     let inlined_html = INDEX_HTML
         .replace("__MASCOT_FLYING__", &flying_b64)
@@ -150,7 +181,9 @@ fn main() -> Result<()> {
     let handler_proxy = proxy.clone();
     let local_app_data = std::env::var("LOCALAPPDATA")
         .unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Local".to_string());
-    let data_dir = std::path::PathBuf::from(local_app_data).join("otter").join("webview_data");
+    let data_dir = std::path::PathBuf::from(local_app_data)
+        .join("otter")
+        .join("webview_data");
     let _ = std::fs::create_dir_all(&data_dir);
     let mut web_context = WebContext::new(Some(data_dir));
 
@@ -193,8 +226,11 @@ fn main() -> Result<()> {
         Err(e) => {
             let err_msg = e.to_string();
             if err_msg.contains("0x800700AA") || err_msg.contains("resource is in use") {
-                eprintln!("[Otter] Primary WebView2 data directory locked. Recovering with isolated session data directory...");
-                let fallback_dir = std::env::temp_dir().join(format!("otter_wv_{}", std::process::id()));
+                eprintln!(
+                    "[Otter] Primary WebView2 data directory locked. Recovering with isolated session data directory..."
+                );
+                let fallback_dir =
+                    std::env::temp_dir().join(format!("otter_wv_{}", std::process::id()));
                 let _ = std::fs::create_dir_all(&fallback_dir);
                 let mut fallback_ctx = WebContext::new(Some(fallback_dir));
                 WebViewBuilder::new_with_web_context(&mut fallback_ctx)
@@ -311,10 +347,7 @@ fn app_state_init(_rt: &tokio::runtime::Runtime) -> Result<AppState> {
     AppState::new()
 }
 
-async fn generate_full_state(
-    app_state: &AppState,
-    current_target_dir: &str,
-) -> Result<String> {
+async fn generate_full_state(app_state: &AppState, current_target_dir: &str) -> Result<String> {
     let jobs = app_state.manifest.list_jobs()?;
     let snap_map = app_state.active_snapshots.lock().await.clone();
 
@@ -349,15 +382,20 @@ async fn generate_full_state(
             total_speed_bps += snap.speed_bps;
         } else if let Some(total) = j.total_size {
             if total > 0 {
-                progress_pct = ((j.downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0);
+                progress_pct =
+                    ((j.downloaded_bytes as f64 / total as f64) * 100.0).clamp(0.0, 100.0);
             }
         }
 
         total_downloaded_bytes += downloaded;
 
-        let total_size_str = total_bytes
-            .map(format_bytes)
-            .unwrap_or_else(|| if downloaded > 0 { format_bytes(downloaded) } else { "Unknown".to_string() });
+        let total_size_str = total_bytes.map(format_bytes).unwrap_or_else(|| {
+            if downloaded > 0 {
+                format_bytes(downloaded)
+            } else {
+                "Unknown".to_string()
+            }
+        });
 
         let streams = if let Some(snap) = snap_map.get(&j.id) {
             snap.connections
@@ -394,14 +432,19 @@ async fn generate_full_state(
     }
 
     let active_count = active_jobs.len();
-    let completed_count = jobs.iter().filter(|j| j.status == types::DownloadStatus::Completed).count();
+    let completed_count = jobs
+        .iter()
+        .filter(|j| j.status == types::DownloadStatus::Completed)
+        .count();
     let total_speed_mb = total_speed_bps / (1024.0 * 1024.0);
     let total_dl_gb = (total_downloaded_bytes as f64) / (1024.0 * 1024.0 * 1024.0);
 
     let system_specs = app_state.get_system_specs(current_target_dir);
 
     let monitored_dirs = vec![
-        std::env::var("USERPROFILE").map(|u| std::path::PathBuf::from(u).join("Downloads")).unwrap_or_default(),
+        std::env::var("USERPROFILE")
+            .map(|u| std::path::PathBuf::from(u).join("Downloads"))
+            .unwrap_or_default(),
         std::path::PathBuf::from(current_target_dir),
     ];
     let live_det = {
@@ -442,12 +485,18 @@ async fn run_media_download_job(
     connections: usize,
     cancel_token: tokio_util::sync::CancellationToken,
     manifest: Arc<engine::manifest::ManifestStore>,
-    active_snaps: Arc<tokio::sync::Mutex<std::collections::HashMap<String, types::ProgressSnapshot>>>,
+    active_snaps: Arc<
+        tokio::sync::Mutex<std::collections::HashMap<String, types::ProgressSnapshot>>,
+    >,
     state_clone: Arc<AppState>,
     proxy_clone: EventLoopProxy<UserEvent>,
 ) {
     let target_path = std::path::PathBuf::from(&target_dir).join(&resolved_name);
-    let script_path = get_media_script_path();
+    let script_path = if is_ai_workload_url(&url) {
+        get_ai_script_path()
+    } else {
+        get_media_script_path()
+    };
     let mut cmd = tokio::process::Command::new("python");
     cmd.arg("-u")
         .arg(&script_path)
@@ -594,10 +643,48 @@ fn handle_ipc_message(
         }
         "detect_url" => {
             let url = val.get("url").and_then(|u| u.as_str()).unwrap_or("");
-            let default_dir = rt.block_on(async { state.settings.lock().await.default_download_dir.clone() });
+            let default_dir =
+                rt.block_on(async { state.settings.lock().await.default_download_dir.clone() });
             let url_str = url.to_string();
 
-            if is_media_url(&url_str) {
+            if is_ai_workload_url(&url_str) {
+                let script_path = get_ai_script_path();
+                let proxy_clone = proxy.clone();
+                let url_clone = url_str.clone();
+
+                rt.spawn(async move {
+                    #[cfg(windows)]
+                    use std::os::windows::process::CommandExt;
+                    let mut cmd = std::process::Command::new("python");
+                    cmd.arg(&script_path).arg("probe").arg(&url_clone).arg(&default_dir);
+                    #[cfg(windows)]
+                    cmd.creation_flags(0x08000000);
+
+                    if let Ok(output) = cmd.output() {
+                        let out_str = String::from_utf8_lossy(&output.stdout);
+                        if let Some(json_start) = out_str.find('{') {
+                            if let Ok(res) = serde_json::from_str::<serde_json::Value>(&out_str[json_start..]) {
+                                if res.get("is_valid").and_then(|b| b.as_bool()).unwrap_or(false) {
+                                    let script = format!(
+                                        "if (window.onOtterEvent) {{ window.onOtterEvent({{ type: 'detection_result', data: {} }}); }}",
+                                        serde_json::to_string(&res).unwrap_or_default()
+                                    );
+                                    let _ = proxy_clone.send_event(UserEvent::EvalScript(script));
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
+                    let result = UrlDetector::detect(&url_clone, &default_dir);
+                    let res_json = serde_json::to_string(&result).unwrap_or_default();
+                    let script = format!(
+                        "if (window.onOtterEvent) {{ window.onOtterEvent({{ type: 'detection_result', data: {} }}); }}",
+                        res_json
+                    );
+                    let _ = proxy_clone.send_event(UserEvent::EvalScript(script));
+                });
+            } else if is_media_url(&url_str) {
                 let script_path = get_media_script_path();
                 let proxy_clone = proxy.clone();
                 let url_clone = url_str.clone();
@@ -714,14 +801,40 @@ fn handle_ipc_message(
             }
         }
         "start_download" => {
-            let url = val.get("url").and_then(|u| u.as_str()).unwrap_or("").to_string();
-            let destination = val.get("destination").and_then(|d| d.as_str()).map(|s| s.to_string());
-            let filename = val.get("filename").and_then(|f| f.as_str()).map(|s| s.to_string());
-            let connections = val.get("connections").and_then(|c| c.as_u64()).unwrap_or(32) as usize;
+            let url = val
+                .get("url")
+                .and_then(|u| u.as_str())
+                .unwrap_or("")
+                .to_string();
+            let destination = val
+                .get("destination")
+                .and_then(|d| d.as_str())
+                .map(|s| s.to_string());
+            let filename = val
+                .get("filename")
+                .and_then(|f| f.as_str())
+                .map(|s| s.to_string());
+            let connections = val
+                .get("connections")
+                .and_then(|c| c.as_u64())
+                .unwrap_or(32) as usize;
             let connections = if connections == 0 { 32 } else { connections };
-            let quality_id = val.get("quality_id").and_then(|q| q.as_str()).unwrap_or("video_best").to_string();
-            let is_media = val.get("is_media").and_then(|m| m.as_bool()).unwrap_or(false) || is_media_url(&url);
-            let thumbnail = val.get("thumbnail").and_then(|t| t.as_str()).unwrap_or("").to_string();
+            let quality_id = val
+                .get("quality_id")
+                .and_then(|q| q.as_str())
+                .unwrap_or("video_best")
+                .to_string();
+            let is_media = val
+                .get("is_media")
+                .and_then(|m| m.as_bool())
+                .unwrap_or(false)
+                || is_media_url(&url)
+                || is_ai_workload_url(&url);
+            let thumbnail = val
+                .get("thumbnail")
+                .and_then(|t| t.as_str())
+                .unwrap_or("")
+                .to_string();
 
             let mgr = state.manager.clone();
             let manifest = state.manifest.clone();
@@ -861,7 +974,11 @@ fn handle_ipc_message(
             });
         }
         "pause_download" => {
-            let id = val.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+            let id = val
+                .get("id")
+                .and_then(|i| i.as_str())
+                .unwrap_or("")
+                .to_string();
             let cancel_tokens = state.cancellation_tokens.clone();
             let manifest = state.manifest.clone();
 
@@ -877,7 +994,11 @@ fn handle_ipc_message(
             });
         }
         "resume_download" => {
-            let id = val.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+            let id = val
+                .get("id")
+                .and_then(|i| i.as_str())
+                .unwrap_or("")
+                .to_string();
             let manifest = state.manifest.clone();
             let mgr = state.manager.clone();
             let cancel_tokens = state.cancellation_tokens.clone();
@@ -894,11 +1015,16 @@ fn handle_ipc_message(
                     }
                     let _ = manifest.update_status(&id, types::DownloadStatus::Active, None);
 
-                    if is_media_url(&job.url) {
+                    if is_media_url(&job.url) || is_ai_workload_url(&job.url) {
                         let target_path = std::path::PathBuf::from(&job.destination);
-                        let target_dir = target_path.parent().map(|p| p.display().to_string()).unwrap_or_else(|| {
-                            std::env::var("USERPROFILE").map(|u| format!("{}\\Desktop", u)).unwrap_or_default()
-                        });
+                        let target_dir = target_path
+                            .parent()
+                            .map(|p| p.display().to_string())
+                            .unwrap_or_else(|| {
+                                std::env::var("USERPROFILE")
+                                    .map(|u| format!("{}\\Desktop", u))
+                                    .unwrap_or_default()
+                            });
                         let quality_id = "video_best".to_string();
                         let connections = 32;
 
@@ -914,7 +1040,8 @@ fn handle_ipc_message(
                             active_snaps.clone(),
                             state_clone.clone(),
                             proxy_clone.clone(),
-                        ).await;
+                        )
+                        .await;
                     } else {
                         let total_size = job.total_size;
                         let connections = match total_size {
@@ -934,7 +1061,11 @@ fn handle_ipc_message(
             });
         }
         "cancel_download" => {
-            let id = val.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
+            let id = val
+                .get("id")
+                .and_then(|i| i.as_str())
+                .unwrap_or("")
+                .to_string();
             let cancel_tokens = state.cancellation_tokens.clone();
             let manifest = state.manifest.clone();
             let active_snaps = state.active_snapshots.clone();
@@ -959,15 +1090,27 @@ fn handle_ipc_message(
                     map.remove(&id);
                 }
 
-                let default_dir = state_clone.settings.lock().await.default_download_dir.clone();
+                let default_dir = state_clone
+                    .settings
+                    .lock()
+                    .await
+                    .default_download_dir
+                    .clone();
                 if let Ok(state_json) = generate_full_state(&state_clone, &default_dir).await {
                     let _ = proxy_clone.send_event(UserEvent::PushStateUpdate(state_json));
                 }
             });
         }
         "remove_job" => {
-            let id = val.get("id").and_then(|i| i.as_str()).unwrap_or("").to_string();
-            let delete_file = val.get("delete_file").and_then(|d| d.as_bool()).unwrap_or(false);
+            let id = val
+                .get("id")
+                .and_then(|i| i.as_str())
+                .unwrap_or("")
+                .to_string();
+            let delete_file = val
+                .get("delete_file")
+                .and_then(|d| d.as_bool())
+                .unwrap_or(false);
             let cancel_tokens = state.cancellation_tokens.clone();
             let manifest = state.manifest.clone();
 
@@ -988,7 +1131,11 @@ fn handle_ipc_message(
             });
         }
         "open_path" => {
-            let path_str = val.get("path").and_then(|p| p.as_str()).unwrap_or("").to_string();
+            let path_str = val
+                .get("path")
+                .and_then(|p| p.as_str())
+                .unwrap_or("")
+                .to_string();
             #[cfg(windows)]
             {
                 let path = std::path::PathBuf::from(&path_str);
@@ -998,23 +1145,23 @@ fn handle_ipc_message(
                             .arg(format!("/select,{}", path.display()))
                             .spawn();
                     } else {
-                        let _ = std::process::Command::new("explorer")
-                            .arg(&path)
-                            .spawn();
+                        let _ = std::process::Command::new("explorer").arg(&path).spawn();
                     }
                 } else if let Some(parent) = path.parent() {
                     if parent.exists() {
-                        let _ = std::process::Command::new("explorer")
-                            .arg(parent)
-                            .spawn();
+                        let _ = std::process::Command::new("explorer").arg(parent).spawn();
                     } else {
-                        let default_dir = rt.block_on(async { state.settings.lock().await.default_download_dir.clone() });
+                        let default_dir = rt.block_on(async {
+                            state.settings.lock().await.default_download_dir.clone()
+                        });
                         let _ = std::process::Command::new("explorer")
                             .arg(default_dir)
                             .spawn();
                     }
                 } else {
-                    let default_dir = rt.block_on(async { state.settings.lock().await.default_download_dir.clone() });
+                    let default_dir = rt.block_on(async {
+                        state.settings.lock().await.default_download_dir.clone()
+                    });
                     let _ = std::process::Command::new("explorer")
                         .arg(default_dir)
                         .spawn();
@@ -1022,22 +1169,30 @@ fn handle_ipc_message(
             }
         }
         "open_file" => {
-            let path_str = val.get("path").and_then(|p| p.as_str()).unwrap_or("").to_string();
+            let path_str = val
+                .get("path")
+                .and_then(|p| p.as_str())
+                .unwrap_or("")
+                .to_string();
             #[cfg(windows)]
             {
-                let _ = std::process::Command::new("explorer")
-                    .arg(path_str)
-                    .spawn();
+                let _ = std::process::Command::new("explorer").arg(path_str).spawn();
             }
         }
         "run_doctor" => {
-            let default_dir = rt.block_on(async { state.settings.lock().await.default_download_dir.clone() });
+            let default_dir =
+                rt.block_on(async { state.settings.lock().await.default_download_dir.clone() });
             if let Ok(doctor) = engine::doctor::DoctorEngine::new() {
                 let report = rt.block_on(async {
-                    doctor.run_diagnostics(Some(std::path::PathBuf::from(default_dir)), true).await
+                    doctor
+                        .run_diagnostics(Some(std::path::PathBuf::from(default_dir)), true)
+                        .await
                 });
                 if let Ok(rep_json) = serde_json::to_string(&report) {
-                    let script = format!("if (window.onOtterEvent) {{ window.onOtterEvent({{ type: 'doctor_result', data: {} }}); }}", rep_json);
+                    let script = format!(
+                        "if (window.onOtterEvent) {{ window.onOtterEvent({{ type: 'doctor_result', data: {} }}); }}",
+                        rep_json
+                    );
                     let _ = webview.evaluate_script(&script);
                 }
             }
@@ -1078,7 +1233,7 @@ fn handle_ipc_message(
                                 "settings": updated_settings
                             });
                             let _ = proxy_clone.send_event(UserEvent::PushStateUpdate(
-                                serde_json::to_string(&update_payload).unwrap_or_default()
+                                serde_json::to_string(&update_payload).unwrap_or_default(),
                             ));
                         }
                     }
@@ -1113,9 +1268,14 @@ fn handle_ipc_message(
 }
 
 fn detect_platform_label(url: &str) -> String {
-    let lower = url.to_lowercase();
+    let lower = url.trim().to_lowercase();
     if lower.contains("huggingface.co") || lower.starts_with("hf:") {
         "Hugging Face".into()
+    } else if lower.contains("kaggle.com")
+        || lower.starts_with("kaggle:")
+        || lower.starts_with("kaggle ")
+    {
+        "Kaggle".into()
     } else if lower.contains("youtube.com") || lower.contains("youtu.be") {
         "YouTube".into()
     } else if lower.contains("instagram.com") {
@@ -1128,7 +1288,11 @@ fn detect_platform_label(url: &str) -> String {
         "Epic Games".into()
     } else if lower.contains("github.com") {
         "GitHub".into()
-    } else if lower.contains("ollama.com") || lower.starts_with("ollama:") {
+    } else if lower.contains("ollama.com")
+        || lower.starts_with("ollama:")
+        || lower.starts_with("ollama pull ")
+        || lower.starts_with("ollama run ")
+    {
         "Ollama".into()
     } else {
         "Direct Link".into()
@@ -1153,12 +1317,41 @@ fn format_bytes(bytes: u64) -> String {
 }
 
 fn get_media_script_path() -> std::path::PathBuf {
-    let local = std::env::var("LOCALAPPDATA").unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Local".to_string());
-    let dir = std::path::PathBuf::from(local).join("otter").join("scripts");
+    let local = std::env::var("LOCALAPPDATA")
+        .unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Local".to_string());
+    let dir = std::path::PathBuf::from(local)
+        .join("otter")
+        .join("scripts");
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join("media_engine.py");
     let _ = std::fs::write(&path, include_str!("../scripts/media_engine.py"));
     path
+}
+
+fn get_ai_script_path() -> std::path::PathBuf {
+    let local = std::env::var("LOCALAPPDATA")
+        .unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Local".to_string());
+    let dir = std::path::PathBuf::from(local)
+        .join("otter")
+        .join("scripts");
+    let _ = std::fs::create_dir_all(&dir);
+    let path = dir.join("ai_engine.py");
+    let _ = std::fs::write(&path, include_str!("../scripts/ai_engine.py"));
+    path
+}
+
+fn is_ai_workload_url(url: &str) -> bool {
+    let lower = url.trim().to_lowercase();
+    lower.starts_with("ollama pull ")
+        || lower.starts_with("ollama run ")
+        || lower.starts_with("ollama:")
+        || lower.contains("ollama.com/")
+        || lower.contains("huggingface.co/")
+        || lower.starts_with("hf:")
+        || lower.contains("kaggle.com/datasets/")
+        || lower.contains("kaggle.com/api/v1/datasets/")
+        || lower.starts_with("kaggle:")
+        || lower.starts_with("kaggle ")
 }
 
 fn is_media_url(url: &str) -> bool {
@@ -1208,12 +1401,19 @@ fn cleanup_job_files(destination: &str) {
     let _ = std::fs::remove_file(format!("{}.part", destination));
     let _ = std::fs::remove_file(format!("{}.ytdl", destination));
 
-    if let (Some(parent), Some(stem)) = (dest_path.parent(), dest_path.file_stem().and_then(|s| s.to_str())) {
+    if let (Some(parent), Some(stem)) = (
+        dest_path.parent(),
+        dest_path.file_stem().and_then(|s| s.to_str()),
+    ) {
         if let Ok(entries) = std::fs::read_dir(parent) {
             for entry in entries.flatten() {
                 let p = entry.path();
                 if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
-                    if name.starts_with(stem) && (name.ends_with(".part") || name.ends_with(".ytdl") || name.contains(".part-")) {
+                    if name.starts_with(stem)
+                        && (name.ends_with(".part")
+                            || name.ends_with(".ytdl")
+                            || name.contains(".part-"))
+                    {
                         let _ = std::fs::remove_file(&p);
                     }
                 }
@@ -1222,7 +1422,9 @@ fn cleanup_job_files(destination: &str) {
     }
 
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
-        let staging_dir = std::path::PathBuf::from(&local).join("otter").join("staging");
+        let staging_dir = std::path::PathBuf::from(&local)
+            .join("otter")
+            .join("staging");
         let _ = std::fs::remove_dir_all(&staging_dir);
         let temp_dir = std::path::PathBuf::from(&local).join("otter").join("temp");
         let _ = std::fs::remove_dir_all(&temp_dir);

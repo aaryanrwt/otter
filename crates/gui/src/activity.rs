@@ -202,7 +202,11 @@ impl ActivityEngine {
             let total_bytes = job.total_size;
             let downloaded = job.downloaded_bytes;
             let pct = if let Some(tot) = total_bytes {
-                if tot > 0 { ((downloaded as f64 / tot as f64) * 100.0).clamp(0.0, 100.0) } else { 0.0 }
+                if tot > 0 {
+                    ((downloaded as f64 / tot as f64) * 100.0).clamp(0.0, 100.0)
+                } else {
+                    0.0
+                }
             } else {
                 0.0
             };
@@ -265,7 +269,11 @@ impl ActivityEngine {
                                         .ok()
                                         .and_then(|u| u.host_str().map(|h| h.to_string()))
                                         .unwrap_or(host);
-                                    (domain, "Verified via NTFS Zone.Identifier ADS".into(), "High (NTFS ADS)".into())
+                                    (
+                                        domain,
+                                        "Verified via NTFS Zone.Identifier ADS".into(),
+                                        "High (NTFS ADS)".into(),
+                                    )
                                 }
                                 None => (
                                     "Download detected — source unknown".into(),
@@ -304,7 +312,12 @@ impl ActivityEngine {
                 (
                     ActivityStatus::Active,
                     "92.4 MB/s".to_string(),
-                    format!("{} active download{} • {}", active_count, if active_count > 1 { "s" } else { "" }, format_bytes(total_b)),
+                    format!(
+                        "{} active download{} • {}",
+                        active_count,
+                        if active_count > 1 { "s" } else { "" },
+                        format_bytes(total_b)
+                    ),
                 )
             } else {
                 (
@@ -325,8 +338,16 @@ impl ActivityEngine {
                 completed_downloads_count: chrome_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
-                aggregate_speed_bps: if active_count > 0 { 92.4 * 1024.0 * 1024.0 } else { 0.0 },
-                aggregate_speed_str: if active_count > 0 { "92.4 MB/s".into() } else { "0.0 MB/s".into() },
+                aggregate_speed_bps: if active_count > 0 {
+                    92.4 * 1024.0 * 1024.0
+                } else {
+                    0.0
+                },
+                aggregate_speed_str: if active_count > 0 {
+                    "92.4 MB/s".into()
+                } else {
+                    "0.0 MB/s".into()
+                },
                 short_desc: desc,
                 detection_source: "Chromium Native Downloads & Windows Process".into(),
                 detection_confidence: "High (Verified Process & NTFS Zone ADS)".into(),
@@ -345,7 +366,12 @@ impl ActivityEngine {
                 (
                     ActivityStatus::Active,
                     "18.7 MB/s".into(),
-                    format!("{} active download{} • {}", active_count, if active_count > 1 { "s" } else { "" }, format_bytes(total_b)),
+                    format!(
+                        "{} active download{} • {}",
+                        active_count,
+                        if active_count > 1 { "s" } else { "" },
+                        format_bytes(total_b)
+                    ),
                 )
             } else if steam_running {
                 (
@@ -372,8 +398,16 @@ impl ActivityEngine {
                 completed_downloads_count: steam_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
-                aggregate_speed_bps: if active_count > 0 { 18.7 * 1024.0 * 1024.0 } else { 0.0 },
-                aggregate_speed_str: if active_count > 0 { "18.7 MB/s".into() } else { "0.0 MB/s".into() },
+                aggregate_speed_bps: if active_count > 0 {
+                    18.7 * 1024.0 * 1024.0
+                } else {
+                    0.0
+                },
+                aggregate_speed_str: if active_count > 0 {
+                    "18.7 MB/s".into()
+                } else {
+                    "0.0 MB/s".into()
+                },
                 short_desc: desc,
                 detection_source: "Steam Client Protocol (steam://) & Process Introspection".into(),
                 detection_confidence: "High (Process & Protocol Verified)".into(),
@@ -392,7 +426,12 @@ impl ActivityEngine {
                 (
                     ActivityStatus::Active,
                     "31.2 MB/s".into(),
-                    format!("{} active download{} • {}", active_count, if active_count > 1 { "s" } else { "" }, format_bytes(total_b)),
+                    format!(
+                        "{} active download{} • {}",
+                        active_count,
+                        if active_count > 1 { "s" } else { "" },
+                        format_bytes(total_b)
+                    ),
                 )
             } else {
                 (
@@ -413,8 +452,16 @@ impl ActivityEngine {
                 completed_downloads_count: epic_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
-                aggregate_speed_bps: if active_count > 0 { 31.2 * 1024.0 * 1024.0 } else { 0.0 },
-                aggregate_speed_str: if active_count > 0 { "31.2 MB/s".into() } else { "0.0 MB/s".into() },
+                aggregate_speed_bps: if active_count > 0 {
+                    31.2 * 1024.0 * 1024.0
+                } else {
+                    0.0
+                },
+                aggregate_speed_str: if active_count > 0 {
+                    "31.2 MB/s".into()
+                } else {
+                    "0.0 MB/s".into()
+                },
                 short_desc: desc,
                 detection_source: "Epic Games Launcher Integration & Manifest Protocol".into(),
                 detection_confidence: "High (Launcher Introspection)".into(),
@@ -432,7 +479,12 @@ impl ActivityEngine {
                 (
                     ActivityStatus::Active,
                     "92.4 MB/s".into(),
-                    format!("{} active download{} • {}", active_count, if active_count > 1 { "s" } else { "" }, format_bytes(total_b)),
+                    format!(
+                        "{} active download{} • {}",
+                        active_count,
+                        if active_count > 1 { "s" } else { "" },
+                        format_bytes(total_b)
+                    ),
                 )
             } else if !hf_jobs.is_empty() {
                 (
@@ -459,8 +511,16 @@ impl ActivityEngine {
                 completed_downloads_count: hf_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
-                aggregate_speed_bps: if active_count > 0 { 92.4 * 1024.0 * 1024.0 } else { 0.0 },
-                aggregate_speed_str: if active_count > 0 { "92.4 MB/s".into() } else { "0.0 MB/s".into() },
+                aggregate_speed_bps: if active_count > 0 {
+                    92.4 * 1024.0 * 1024.0
+                } else {
+                    0.0
+                },
+                aggregate_speed_str: if active_count > 0 {
+                    "92.4 MB/s".into()
+                } else {
+                    "0.0 MB/s".into()
+                },
                 short_desc: desc,
                 detection_source: "Hugging Face Model Hub Range Engine".into(),
                 detection_confidence: "High (100% Direct Stream)".into(),
@@ -471,7 +531,8 @@ impl ActivityEngine {
         }
 
         // GitHub / Ollama
-        let ollama_running = running_processes.contains("ollama.exe") || running_processes.contains("ollama app.exe");
+        let ollama_running = running_processes.contains("ollama.exe")
+            || running_processes.contains("ollama app.exe");
         {
             let active_count = gh_jobs.iter().filter(|j| j.status == "Active").count();
             let total_b: u64 = gh_jobs.iter().map(|j| j.downloaded_bytes).sum();
@@ -479,7 +540,12 @@ impl ActivityEngine {
                 (
                     ActivityStatus::Active,
                     "Active".into(),
-                    format!("{} active download{} • {}", active_count, if active_count > 1 { "s" } else { "" }, format_bytes(total_b)),
+                    format!(
+                        "{} active download{} • {}",
+                        active_count,
+                        if active_count > 1 { "s" } else { "" },
+                        format_bytes(total_b)
+                    ),
                 )
             } else if !gh_jobs.is_empty() {
                 (
@@ -532,15 +598,27 @@ impl ActivityEngine {
                 app_id: "instagram".into(),
                 app_name: "Instagram".into(),
                 icon_svg: crate::logos::get_logo_img_tag("instagram"),
-                status: if active_count > 0 { ActivityStatus::Active } else { ActivityStatus::Completed },
-                status_label: if active_count > 0 { "Active".into() } else { "Completed".into() },
+                status: if active_count > 0 {
+                    ActivityStatus::Active
+                } else {
+                    ActivityStatus::Completed
+                },
+                status_label: if active_count > 0 {
+                    "Active".into()
+                } else {
+                    "Completed".into()
+                },
                 active_downloads_count: active_count,
                 completed_downloads_count: insta_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
                 aggregate_speed_bps: 0.0,
                 aggregate_speed_str: "0.0 MB/s".into(),
-                short_desc: format!("{} Instagram media item{} detected", insta_jobs.len(), if insta_jobs.len() > 1 { "s" } else { "" }),
+                short_desc: format!(
+                    "{} Instagram media item{} detected",
+                    insta_jobs.len(),
+                    if insta_jobs.len() > 1 { "s" } else { "" }
+                ),
                 detection_source: "Instagram Reels & Media Downloader".into(),
                 detection_confidence: "High (Domain Verified)".into(),
                 source_website: Some("instagram.com".into()),
@@ -558,15 +636,27 @@ impl ActivityEngine {
                 app_id: "pinterest".into(),
                 app_name: "Pinterest".into(),
                 icon_svg: crate::logos::get_logo_img_tag("pinterest"),
-                status: if active_count > 0 { ActivityStatus::Active } else { ActivityStatus::Completed },
-                status_label: if active_count > 0 { "Active".into() } else { "Completed".into() },
+                status: if active_count > 0 {
+                    ActivityStatus::Active
+                } else {
+                    ActivityStatus::Completed
+                },
+                status_label: if active_count > 0 {
+                    "Active".into()
+                } else {
+                    "Completed".into()
+                },
                 active_downloads_count: active_count,
                 completed_downloads_count: pin_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
                 aggregate_speed_bps: 0.0,
                 aggregate_speed_str: "0.0 MB/s".into(),
-                short_desc: format!("{} Pinterest asset{} detected", pin_jobs.len(), if pin_jobs.len() > 1 { "s" } else { "" }),
+                short_desc: format!(
+                    "{} Pinterest asset{} detected",
+                    pin_jobs.len(),
+                    if pin_jobs.len() > 1 { "s" } else { "" }
+                ),
                 detection_source: "Pinterest Board & Pin Extractor".into(),
                 detection_confidence: "High (Domain Verified)".into(),
                 source_website: Some("pinterest.com".into()),
@@ -584,15 +674,27 @@ impl ActivityEngine {
                 app_id: "generic".into(),
                 app_name: "Direct Downloads".into(),
                 icon_svg: crate::logos::get_logo_img_tag("folder"),
-                status: if active_count > 0 { ActivityStatus::Active } else { ActivityStatus::Completed },
-                status_label: if active_count > 0 { "Active".into() } else { "Completed".into() },
+                status: if active_count > 0 {
+                    ActivityStatus::Active
+                } else {
+                    ActivityStatus::Completed
+                },
+                status_label: if active_count > 0 {
+                    "Active".into()
+                } else {
+                    "Completed".into()
+                },
                 active_downloads_count: active_count,
                 completed_downloads_count: generic_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
                 aggregate_speed_bps: 0.0,
                 aggregate_speed_str: "0.0 MB/s".into(),
-                short_desc: format!("{} download{} detected across your PC", generic_jobs.len(), if generic_jobs.len() > 1 { "s" } else { "" }),
+                short_desc: format!(
+                    "{} download{} detected across your PC",
+                    generic_jobs.len(),
+                    if generic_jobs.len() > 1 { "s" } else { "" }
+                ),
                 detection_source: "Universal File & Socket Monitor".into(),
                 detection_confidence: "Medium (Socket / Chunk Detection)".into(),
                 source_website: Some("Direct / Unknown Source".into()),
@@ -655,12 +757,18 @@ mod tests {
     #[test]
     fn test_live_detection_toggle_behavior() {
         let items = ActivityEngine::scan_activities(&[], false, &[]);
-        assert!(items.is_empty(), "When live detection is disabled, scan must return empty/disabled");
+        assert!(
+            items.is_empty(),
+            "When live detection is disabled, scan must return empty/disabled"
+        );
     }
 
     #[test]
     fn test_activity_with_running_processes() {
         let items = ActivityEngine::scan_activities(&[], true, &[]);
-        assert!(!items.is_empty(), "When live detection is on, running apps should populate cards");
+        assert!(
+            !items.is_empty(),
+            "When live detection is on, running apps should populate cards"
+        );
     }
 }
