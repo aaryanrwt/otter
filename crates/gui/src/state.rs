@@ -184,6 +184,7 @@ pub struct AppState {
         Arc<Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>>,
     pub thumbnails: Arc<Mutex<std::collections::HashMap<String, String>>>,
     pub settings: Arc<Mutex<GuiSettings>>,
+    pub browser_bridge: Arc<crate::browser_bridge::BrowserBridge>,
 }
 
 impl AppState {
@@ -194,6 +195,7 @@ impl AppState {
             64,
         )?);
         let settings = Arc::new(Mutex::new(GuiSettings::load()));
+        let browser_bridge = Arc::new(crate::browser_bridge::BrowserBridge::new());
 
         Ok(Self {
             manager,
@@ -202,6 +204,7 @@ impl AppState {
             cancellation_tokens: Arc::new(Mutex::new(std::collections::HashMap::new())),
             thumbnails: Arc::new(Mutex::new(std::collections::HashMap::new())),
             settings,
+            browser_bridge,
         })
     }
 

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "OTTER Download Engine — Chrome Integration",
+  "version": "0.1.0",
+  "description": "Seamless integration between Google Chrome and the high-throughput, crash-safe OTTER Rust download engine.",
+  "permissions": [
+    "downloads",
+    "storage",
+    "nativeMessaging"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:45771/*",
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "OTTER 0.1.0 Browser Bridge"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

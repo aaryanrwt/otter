@@ -1,0 +1,586 @@
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::net::SocketAddr;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::Mutex;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BrowserDownloadItem {
+    pub id: i64,
+    pub filename: String,
+    pub url: String,
+    pub sanitized_url: String,
+    pub domain: String,
+    pub target_path: String,
+    pub mime_type: String,
+    pub total_bytes: Option<u64>,
+    pub received_bytes: u64,
+    pub state: String,         // "in_progress", "paused", "complete", "interrupted"
+    pub status: String, // "Detected", "Eligible for OTTER", "OTTER Engine Active", "Paused in Chrome", etc.
+    pub engine_status: String, // "Native Browser Download" or "OTTER Engine Active"
+    pub is_eligible: bool,
+    pub is_otter_managed: bool,
+    pub current_speed_bps: f64,
+    pub average_speed_bps: f64,
+    pub start_time_ms: u64,
+    pub last_update_ms: u64,
+    #[serde(skip)]
+    pub last_bytes: u64,
+    #[serde(skip)]
+    pub last_instant: Option<Instant>,
+    pub error: Option<String>,
+    pub otter_job_id: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct BrowserBridge {
+    pub items: Arc<Mutex<HashMap<i64, BrowserDownloadItem>>>,
+    pub client: reqwest::Client,
+}
+
+impl BrowserBridge {
+    pub fn new() -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Otter/0.1.0")
+            .build()
+            .unwrap_or_default();
+
+        Self {
+            items: Arc::new(Mutex::new(HashMap::new())),
+            client,
+        }
+    }
+
+    pub async fn get_all_items(&self) -> Vec<BrowserDownloadItem> {
+        let guard = self.items.lock().await;
+        guard.values().cloned().collect()
+    }
+
+    pub async fn get_item(&self, id: i64) -> Option<BrowserDownloadItem> {
+        let guard = self.items.lock().await;
+        guard.get(&id).cloned()
+    }
+
+    /// Redacts query tokens, signatures, and authentication secrets from the URL
+    pub fn sanitize_url(raw: &str) -> (String, String) {
+        if let Ok(mut u) = url::Url::parse(raw) {
+            let domain = u.host_str().unwrap_or("direct").to_string();
+            let mut redacted_pairs = Vec::new();
+            for (k, v) in u.query_pairs() {
+                let lower_k = k.to_lowercase();
+                if lower_k.contains("sig")
+                    || lower_k.contains("token")
+                    || lower_k.contains("nonce")
+                    || lower_k.contains("auth")
+                    || lower_k.contains("key")
+                    || lower_k.contains("expire")
+                {
+                    redacted_pairs.push((k.to_string(), "[REDACTED]".to_string()));
+                } else {
+                    redacted_pairs.push((k.to_string(), v.to_string()));
+                }
+            }
+            u.set_query(None);
+            for (k, v) in redacted_pairs {
+                u.query_pairs_mut().append_pair(&k, &v);
+            }
+            (u.to_string(), domain)
+        } else {
+            (raw.to_string(), "direct".to_string())
+        }
+    }
+
+    /// Probes the server using Range: bytes=0-0 to verify multi-stream capability
+    pub async fn probe_range_support(&self, url: &str) -> (bool, Option<u64>, Option<String>) {
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            return (false, None, None);
+        }
+
+        match self
+            .client
+            .get(url)
+            .header("Range", "bytes=0-0")
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                if status == reqwest::StatusCode::PARTIAL_CONTENT {
+                    // 206 Partial Content: Server supports HTTP byte ranges!
+                    let total_len = resp
+                        .headers()
+                        .get("Content-Range")
+                        .and_then(|v| v.to_str().ok())
+                        .and_then(|s| s.rsplit('/').next())
+                        .and_then(|s| s.parse::<u64>().ok());
+
+                    let etag = resp
+                        .headers()
+                        .get("ETag")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|s| s.to_string());
+
+                    (true, total_len, etag)
+                } else if status == reqwest::StatusCode::OK {
+                    // 200 OK: Accept-Ranges header might still be present
+                    let accept_ranges = resp
+                        .headers()
+                        .get("Accept-Ranges")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|v| v.to_lowercase().contains("bytes"))
+                        .unwrap_or(false);
+
+                    let cl = resp.content_length();
+                    let etag = resp
+                        .headers()
+                        .get("ETag")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|s| s.to_string());
+
+                    (accept_ranges, cl, etag)
+                } else {
+                    (false, None, None)
+                }
+            }
+            Err(_) => (false, None, None),
+        }
+    }
+
+    pub async fn handle_download_created(
+        &self,
+        id: i64,
+        raw_url: String,
+        filename: String,
+        target_path: String,
+        mime_type: String,
+        total_bytes: Option<u64>,
+        received_bytes: u64,
+        auto_handoff: bool,
+    ) -> String {
+        let (sanitized_url, domain) = Self::sanitize_url(&raw_url);
+
+        // Probe for Range acceleration eligibility
+        let (is_eligible, probed_size, _etag) = self.probe_range_support(&raw_url).await;
+        let final_total = total_bytes.or(probed_size);
+
+        let initial_status = if is_eligible {
+            "Eligible for OTTER".to_string()
+        } else {
+            "Native Browser Download".to_string()
+        };
+
+        let engine_status = if auto_handoff && is_eligible {
+            "OTTER Engine Active".to_string()
+        } else {
+            "Native Browser Download".to_string()
+        };
+
+        let item = BrowserDownloadItem {
+            id,
+            filename: if filename.is_empty() {
+                "download".to_string()
+            } else {
+                filename
+            },
+            url: raw_url,
+            sanitized_url,
+            domain,
+            target_path,
+            mime_type,
+            total_bytes: final_total,
+            received_bytes,
+            state: "in_progress".to_string(),
+            status: initial_status,
+            engine_status,
+            is_eligible,
+            is_otter_managed: auto_handoff && is_eligible,
+            current_speed_bps: 0.0,
+            average_speed_bps: 0.0,
+            start_time_ms: 0,
+            last_update_ms: 0,
+            last_bytes: received_bytes,
+            last_instant: Some(Instant::now()),
+            error: None,
+            otter_job_id: None,
+        };
+
+        let action = if auto_handoff && is_eligible {
+            "PAUSE_AND_TAKEOVER".to_string()
+        } else {
+            "MONITOR_ONLY".to_string()
+        };
+
+        let mut guard = self.items.lock().await;
+        guard.insert(id, item);
+
+        action
+    }
+
+    pub async fn handle_download_changed(
+        &self,
+        id: i64,
+        state: Option<String>,
+        paused: Option<bool>,
+        error: Option<String>,
+        received_bytes: Option<u64>,
+        total_bytes: Option<u64>,
+        filename: Option<String>,
+    ) {
+        let mut guard = self.items.lock().await;
+        if let Some(item) = guard.get_mut(&id) {
+            let now = Instant::now();
+            if let Some(rx) = received_bytes {
+                if let Some(last_inst) = item.last_instant {
+                    let elapsed = last_inst.elapsed().as_secs_f64();
+                    if elapsed >= 0.5 {
+                        let delta = rx.saturating_sub(item.last_bytes) as f64;
+                        item.current_speed_bps = delta / elapsed;
+                        item.last_bytes = rx;
+                        item.last_instant = Some(now);
+                    }
+                } else {
+                    item.last_instant = Some(now);
+                    item.last_bytes = rx;
+                }
+                item.received_bytes = rx;
+            }
+
+            if let Some(tot) = total_bytes {
+                if tot > 0 {
+                    item.total_bytes = Some(tot);
+                }
+            }
+
+            if let Some(fname) = filename {
+                if !fname.is_empty() && fname != "download" {
+                    item.filename = fname;
+                }
+            }
+
+            if let Some(st) = state {
+                item.state = st.clone();
+                if st == "complete" {
+                    item.status = "Completed".to_string();
+                    item.current_speed_bps = 0.0;
+                } else if st == "interrupted" {
+                    item.status = "Failed".to_string();
+                    item.error = error.clone();
+                    item.current_speed_bps = 0.0;
+                }
+            }
+
+            if let Some(p) = paused {
+                if p && item.state != "complete" {
+                    item.status = "Paused in Chrome".to_string();
+                    item.current_speed_bps = 0.0;
+                }
+            }
+        }
+    }
+
+    pub async fn set_item_handed_off(&self, id: i64, job_id: String) {
+        let mut guard = self.items.lock().await;
+        if let Some(item) = guard.get_mut(&id) {
+            item.is_otter_managed = true;
+            item.status = "OTTER Engine Active".to_string();
+            item.engine_status = "OTTER Engine Active".to_string();
+            item.otter_job_id = Some(job_id);
+        }
+    }
+}
+
+pub struct BrowserBridgeServer {
+    bridge: BrowserBridge,
+    port: u16,
+}
+
+impl BrowserBridgeServer {
+    pub fn new(bridge: BrowserBridge, port: u16) -> Self {
+        Self { bridge, port }
+    }
+
+    pub async fn run(self) -> Result<()> {
+        let addr = SocketAddr::from(([127, 0, 0, 1], self.port));
+        let listener = match TcpListener::bind(addr).await {
+            Ok(l) => l,
+            Err(e) => {
+                eprintln!(
+                    "[BrowserBridgeServer] Could not bind on 127.0.0.1:{}: {}",
+                    self.port, e
+                );
+                return Err(e.into());
+            }
+        };
+
+        println!(
+            "[BrowserBridgeServer] Listening for Chrome extension events on http://127.0.0.1:{}",
+            self.port
+        );
+
+        loop {
+            match listener.accept().await {
+                Ok((stream, _)) => {
+                    let bridge_clone = self.bridge.clone();
+                    tokio::spawn(async move {
+                        if let Err(e) = handle_connection(stream, bridge_clone).await {
+                            eprintln!("[BrowserBridgeServer] Connection error: {}", e);
+                        }
+                    });
+                }
+                Err(e) => {
+                    eprintln!("[BrowserBridgeServer] Accept error: {}", e);
+                }
+            }
+        }
+    }
+}
+
+async fn handle_connection(mut stream: TcpStream, bridge: BrowserBridge) -> Result<()> {
+    let mut buffer = [0u8; 8192];
+    let n = stream.read(&mut buffer).await?;
+    if n == 0 {
+        return Ok(());
+    }
+
+    let req_str = String::from_utf8_lossy(&buffer[..n]);
+    let mut lines = req_str.lines();
+    let first_line = lines.next().unwrap_or("");
+    let parts: Vec<&str> = first_line.split_whitespace().collect();
+
+    if parts.len() < 2 {
+        return Ok(());
+    }
+
+    let method = parts[0];
+    let path = parts[1];
+
+    // CORS preflight
+    if method == "OPTIONS" {
+        let resp = "HTTP/1.1 200 OK\r\n\
+                    Access-Control-Allow-Origin: *\r\n\
+                    Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n\
+                    Access-Control-Allow-Headers: Content-Type\r\n\
+                    Content-Length: 0\r\n\
+                    Connection: close\r\n\r\n";
+        stream.write_all(resp.as_bytes()).await?;
+        return Ok(());
+    }
+
+    // Find JSON body if POST
+    let body = if let Some(idx) = req_str.find("\r\n\r\n") {
+        &req_str[idx + 4..]
+    } else {
+        ""
+    };
+
+    match (method, path) {
+        ("GET", "/api/browser/status") => {
+            let resp_json = serde_json::json!({
+                "status": "online",
+                "engine": "OTTER Download Engine",
+                "version": "0.1.0",
+                "handshake": "ok"
+            });
+            send_json_response(&mut stream, 200, &resp_json).await?;
+        }
+        ("GET", "/api/browser/downloads") => {
+            let items = bridge.get_all_items().await;
+            let resp_json = serde_json::json!({
+                "downloads": items,
+                "count": items.len()
+            });
+            send_json_response(&mut stream, 200, &resp_json).await?;
+        }
+        ("POST", "/api/browser/download/created") => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+                let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0);
+                let url = v
+                    .get("url")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let filename = v
+                    .get("filename")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let target_path = v
+                    .get("target_path")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let mime = v
+                    .get("mime_type")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let total_bytes = v.get("total_bytes").and_then(|x| x.as_u64());
+                let rx = v
+                    .get("received_bytes")
+                    .and_then(|x| x.as_u64())
+                    .unwrap_or(0);
+                let auto_handoff = v
+                    .get("auto_handoff_requested")
+                    .and_then(|x| x.as_bool())
+                    .unwrap_or(false);
+
+                let handoff_action = bridge
+                    .handle_download_created(
+                        id,
+                        url,
+                        filename,
+                        target_path,
+                        mime,
+                        total_bytes,
+                        rx,
+                        auto_handoff,
+                    )
+                    .await;
+
+                let resp_json = serde_json::json!({
+                    "success": true,
+                    "id": id,
+                    "handoff": handoff_action
+                });
+                send_json_response(&mut stream, 200, &resp_json).await?;
+            } else {
+                send_error_response(&mut stream, 400, "Invalid JSON body").await?;
+            }
+        }
+        ("POST", "/api/browser/download/changed") => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+                let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0);
+                let state = v
+                    .get("state")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string());
+                let paused = v.get("paused").and_then(|x| x.as_bool());
+                let error = v
+                    .get("error")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string());
+                let total_bytes = v.get("total_bytes").and_then(|x| x.as_u64());
+                let filename = v
+                    .get("filename")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string());
+
+                bridge
+                    .handle_download_changed(id, state, paused, error, None, total_bytes, filename)
+                    .await;
+
+                let resp_json = serde_json::json!({ "success": true, "id": id });
+                send_json_response(&mut stream, 200, &resp_json).await?;
+            } else {
+                send_error_response(&mut stream, 400, "Invalid JSON body").await?;
+            }
+        }
+        _ => {
+            send_error_response(&mut stream, 404, "Endpoint not found").await?;
+        }
+    }
+
+    Ok(())
+}
+
+async fn send_json_response(
+    stream: &mut TcpStream,
+    status: u16,
+    data: &serde_json::Value,
+) -> Result<()> {
+    let body_str = serde_json::to_string(data)?;
+    let resp = format!(
+        "HTTP/1.1 {} OK\r\n\
+         Content-Type: application/json\r\n\
+         Access-Control-Allow-Origin: *\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\r\n{}",
+        status,
+        body_str.len(),
+        body_str
+    );
+    stream.write_all(resp.as_bytes()).await?;
+    stream.flush().await?;
+    Ok(())
+}
+
+async fn send_error_response(stream: &mut TcpStream, status: u16, msg: &str) -> Result<()> {
+    let body_str = serde_json::json!({ "error": msg }).to_string();
+    let resp = format!(
+        "HTTP/1.1 {} Error\r\n\
+         Content-Type: application/json\r\n\
+         Access-Control-Allow-Origin: *\r\n\
+         Content-Length: {}\r\n\
+         Connection: close\r\n\r\n{}",
+        status,
+        body_str.len(),
+        body_str
+    );
+    stream.write_all(resp.as_bytes()).await?;
+    stream.flush().await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_url_sanitization_redacts_tokens() {
+        let raw = "https://cdn.example.com/file.zip?sig=secret123&token=abc&nonce=999&normal=val";
+        let (sanitized, domain) = BrowserBridge::sanitize_url(raw);
+        assert_eq!(domain, "cdn.example.com");
+        assert!(sanitized.contains("sig=%5BREDACTED%5D") || sanitized.contains("sig=[REDACTED]"));
+        assert!(
+            sanitized.contains("token=%5BREDACTED%5D") || sanitized.contains("token=[REDACTED]")
+        );
+        assert!(sanitized.contains("normal=val"));
+    }
+
+    #[tokio::test]
+    async fn test_browser_download_created_and_changed() {
+        let bridge = BrowserBridge::new();
+        let action = bridge
+            .handle_download_created(
+                101,
+                "https://example.com/test.zip".into(),
+                "test.zip".into(),
+                "C:\\Downloads\\test.zip".into(),
+                "application/zip".into(),
+                Some(104857600),
+                0,
+                false,
+            )
+            .await;
+
+        assert_eq!(action, "MONITOR_ONLY");
+
+        let items = bridge.get_all_items().await;
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].filename, "test.zip");
+        assert_eq!(items[0].total_bytes, Some(104857600));
+
+        // State change
+        bridge
+            .handle_download_changed(
+                101,
+                Some("complete".into()),
+                None,
+                None,
+                Some(104857600),
+                None,
+                None,
+            )
+            .await;
+
+        let updated = bridge.get_item(101).await.unwrap();
+        assert_eq!(updated.state, "complete");
+        assert_eq!(updated.status, "Completed");
+        assert_eq!(updated.received_bytes, 104857600);
+    }
+}

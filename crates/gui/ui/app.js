@@ -786,6 +786,21 @@ function openActivityDetail(item) {
           ? `<span class="badge-source-unknown">Download detected — source unknown</span>`
           : `<span style="color: #4B5563; font-weight: 500;">Source: ${f.source_website}</span>`;
 
+        let actionBtnHtml = "";
+        if (f.status === "Eligible for OTTER" && f.source_url) {
+          actionBtnHtml = `
+            <div style="margin-top: 8px;">
+              <button class="btn btn-primary btn-sm handoff-btn" data-url="${encodeURIComponent(f.source_url)}" data-filename="${encodeURIComponent(f.filename)}" style="background: #3B82F6; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">
+                🚀 Accelerate with OTTER
+              </button>
+            </div>`;
+        } else if (f.status === "OTTER Engine Active") {
+          actionBtnHtml = `
+            <div style="margin-top: 6px; font-size: 11px; color: #10B981; font-weight: 600;">
+              ✓ OTTER Multi-Stream Engine Active
+            </div>`;
+        }
+
         itemEl.innerHTML = `
           <div class="file-title-row">
             <span class="file-name" title="${f.filename}">${f.filename}</span>
@@ -800,8 +815,27 @@ function openActivityDetail(item) {
             <span>Evidence: ${f.detection_evidence}</span>
             <span>(${f.detection_confidence})</span>
           </div>
+          ${actionBtnHtml}
         `;
         filesContainer.appendChild(itemEl);
+      });
+
+      // Attach handoff click listeners
+      filesContainer.querySelectorAll(".handoff-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const targetUrl = decodeURIComponent(btn.getAttribute("data-url"));
+          const targetFile = decodeURIComponent(btn.getAttribute("data-filename"));
+          sendIpc("start_download", {
+            url: targetUrl,
+            filename: targetFile,
+            destination: "D:\\OTTER_CHROME_BENCHMARK",
+            connections: 16
+          });
+          btn.textContent = "✓ Handed off to OTTER";
+          btn.disabled = true;
+          btn.style.background = "#10B981";
+        });
       });
     }
   }

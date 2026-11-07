@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod activity;
+mod browser_bridge;
 mod detector;
 mod logos;
 mod state;
@@ -343,8 +344,14 @@ fn main() -> Result<()> {
     });
 }
 
-fn app_state_init(_rt: &tokio::runtime::Runtime) -> Result<AppState> {
-    AppState::new()
+fn app_state_init(rt: &tokio::runtime::Runtime) -> Result<AppState> {
+    let state = AppState::new()?;
+    let bridge_clone = (*state.browser_bridge).clone();
+    rt.spawn(async move {
+        let server = browser_bridge::BrowserBridgeServer::new(bridge_clone, 45771);
+        let _ = server.run().await;
+    });
+    Ok(state)
 }
 
 async fn generate_full_state(app_state: &AppState, current_target_dir: &str) -> Result<String> {
@@ -451,7 +458,9 @@ async fn generate_full_state(app_state: &AppState, current_target_dir: &str) -> 
         let s = app_state.settings.lock().await;
         s.live_detection
     };
-    let activities = activity::ActivityEngine::scan_activities(&jobs, live_det, &monitored_dirs);
+    let browser_items = app_state.browser_bridge.get_all_items().await;
+    let activities =
+        activity::ActivityEngine::scan_activities(&jobs, live_det, &monitored_dirs, &browser_items);
 
     let state_payload = serde_json::json!({
         "jobs": all_jobs,
@@ -1127,6 +1136,75 @@ fn handle_ipc_message(
                         cleanup_job_files(&job.destination);
                     }
                     let _ = manifest.delete_job(&id);
+                }
+            });
+        }
+        "handoff_browser_download" => {
+            let id = val.get("id").and_then(|i| i.as_i64()).unwrap_or(0);
+            let bridge = state.browser_bridge.clone();
+            let mgr = state.manager.clone();
+            let manifest = state.manifest.clone();
+            let settings_ref = state.settings.clone();
+            let cancel_tokens = state.cancellation_tokens.clone();
+            let proxy_clone = proxy.clone();
+            let state_clone = state.clone();
+
+            rt.spawn(async move {
+                if let Some(item) = bridge.get_item(id).await {
+                    let default_dir = settings_ref.lock().await.default_download_dir.clone();
+                    let target_dir = if std::path::Path::new("D:\\OTTER_CHROME_BENCHMARK").exists()
+                    {
+                        "D:\\OTTER_CHROME_BENCHMARK".to_string()
+                    } else {
+                        default_dir
+                    };
+                    let _ = std::fs::create_dir_all(&target_dir);
+
+                    let job_id = format!(
+                        "{:x}",
+                        chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                    );
+                    let target_path = std::path::PathBuf::from(&target_dir).join(&item.filename);
+
+                    let job = types::JobRecord {
+                        id: job_id.clone(),
+                        url: item.url.clone(),
+                        filename: item.filename.clone(),
+                        destination: target_path.display().to_string(),
+                        total_size: item.total_bytes,
+                        downloaded_bytes: 0,
+                        status: types::DownloadStatus::Queued,
+                        resumable: true,
+                        etag: None,
+                        last_modified: None,
+                        expected_sha256: None,
+                        computed_sha256: None,
+                        error: None,
+                        created_at: chrono::Utc::now().timestamp_millis(),
+                        completed_at: None,
+                    };
+
+                    if let Ok(_) = manifest.upsert_job(&job) {
+                        bridge.set_item_handed_off(id, job_id.clone()).await;
+
+                        let cancel_token = tokio_util::sync::CancellationToken::new();
+                        {
+                            let mut tokens = cancel_tokens.lock().await;
+                            tokens.insert(job_id.clone(), cancel_token.clone());
+                        }
+
+                        // Trigger GUI push update
+                        if let Ok(st) = generate_full_state(&state_clone, &target_dir).await {
+                            let _ = proxy_clone.send_event(UserEvent::PushStateUpdate(st));
+                        }
+
+                        let _ = mgr.run_job(&job_id, 16, cancel_token).await;
+
+                        {
+                            let mut tokens = cancel_tokens.lock().await;
+                            tokens.remove(&job_id);
+                        }
+                    }
                 }
             });
         }

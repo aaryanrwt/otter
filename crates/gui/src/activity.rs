@@ -178,6 +178,7 @@ impl ActivityEngine {
         manifest_jobs: &[types::JobRecord],
         live_detection: bool,
         monitored_dirs: &[PathBuf],
+        browser_items: &[crate::browser_bridge::BrowserDownloadItem],
     ) -> Vec<ActivityItem> {
         let mut results = Vec::new();
 
@@ -250,7 +251,44 @@ impl ActivityEngine {
             }
         }
 
-        // 2. Scan Download Folders for active browser in-flight files (.crdownload, .part)
+        // 2. Ingest Real-Time Browser Extension Downloads (Highest Precision & Metadata)
+        for b_item in browser_items {
+            let pct = if let Some(tot) = b_item.total_bytes {
+                if tot > 0 {
+                    ((b_item.received_bytes as f64 / tot as f64) * 100.0).clamp(0.0, 100.0)
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+
+            let speed_str = if b_item.current_speed_bps > 0.0 {
+                format!("{:.1} MB/s", b_item.current_speed_bps / (1024.0 * 1024.0))
+            } else if b_item.status.contains("Paused") {
+                "Paused".to_string()
+            } else if b_item.status == "Completed" {
+                "Completed".to_string()
+            } else {
+                b_item.status.clone()
+            };
+
+            chrome_jobs.push(DetectedFileDetail {
+                filename: b_item.filename.clone(),
+                source_url: Some(b_item.sanitized_url.clone()),
+                source_website: b_item.domain.clone(),
+                destination_path: b_item.target_path.clone(),
+                total_bytes: b_item.total_bytes,
+                downloaded_bytes: b_item.received_bytes,
+                progress_pct: pct,
+                speed_str,
+                status: b_item.status.clone(),
+                detection_evidence: "Chrome Extension Native Event (Manifest V3)".into(),
+                detection_confidence: "High (100% Verified Browser Hook)".into(),
+            });
+        }
+
+        // 3. Scan Download Folders for active in-flight files (.crdownload) if not already tracked
         for dir in monitored_dirs {
             if let Ok(entries) = std::fs::read_dir(dir) {
                 for entry in entries.flatten() {
@@ -261,6 +299,15 @@ impl ActivityEngine {
 
                         if lower_name.ends_with(".crdownload") {
                             let clean_name = filename.trim_end_matches(".crdownload").to_string();
+
+                            // Avoid duplicate if already tracked via browser bridge
+                            if chrome_jobs.iter().any(|j| {
+                                j.filename == clean_name
+                                    || j.destination_path == path.to_string_lossy()
+                            }) {
+                                continue;
+                            }
+
                             let file_size = entry.metadata().map(|m| m.len()).unwrap_or(0);
                             let ads = read_zone_identifier(&path);
                             let (src_web, evidence, conf) = match ads {
@@ -287,11 +334,11 @@ impl ActivityEngine {
                                 source_url: None,
                                 source_website: src_web,
                                 destination_path: path.to_string_lossy().to_string(),
-                                total_bytes: if file_size > 0 { Some(file_size) } else { None },
+                                total_bytes: None,
                                 downloaded_bytes: file_size,
-                                progress_pct: 50.0,
+                                progress_pct: 0.0,
                                 speed_str: "Active".into(),
-                                status: "Active".into(),
+                                status: "Active in Chrome (Estimating size...)".into(),
                                 detection_evidence: evidence,
                                 detection_confidence: conf,
                             });
@@ -301,30 +348,40 @@ impl ActivityEngine {
             }
         }
 
-        // 3. Assemble Distinct Application Cards with Genuine Logos
+        // 4. Assemble Distinct Application Cards with Genuine Logos
 
         // Chrome
         let chrome_running = running_processes.contains("chrome.exe");
         if !chrome_jobs.is_empty() || chrome_running {
-            let active_count = chrome_jobs.iter().filter(|j| j.status == "Active").count();
+            let active_count = chrome_jobs
+                .iter()
+                .filter(|j| {
+                    j.status == "Active"
+                        || j.status == "Eligible for OTTER"
+                        || j.status == "OTTER Engine Active"
+                        || j.status.starts_with("Active in Chrome")
+                })
+                .count();
             let total_b: u64 = chrome_jobs.iter().map(|j| j.downloaded_bytes).sum();
-            let (status, label, desc) = if active_count > 0 {
-                (
-                    ActivityStatus::Active,
-                    "92.4 MB/s".to_string(),
-                    format!(
-                        "{} active download{} • {}",
-                        active_count,
-                        if active_count > 1 { "s" } else { "" },
-                        format_bytes(total_b)
-                    ),
+            let real_speed_bps: f64 = browser_items.iter().map(|b| b.current_speed_bps).sum();
+
+            let speed_label = if real_speed_bps > 0.0 {
+                format!("{:.1} MB/s", real_speed_bps / (1024.0 * 1024.0))
+            } else if active_count > 0 {
+                "Active".to_string()
+            } else {
+                "Ready".to_string()
+            };
+
+            let desc = if active_count > 0 {
+                format!(
+                    "{} active download{} • {}",
+                    active_count,
+                    if active_count > 1 { "s" } else { "" },
+                    format_bytes(total_b)
                 )
             } else {
-                (
-                    ActivityStatus::Ready,
-                    "Ready".to_string(),
-                    "Direct web downloads • Browser integration active".to_string(),
-                )
+                "Direct web downloads • Browser integration active".to_string()
             };
 
             results.push(ActivityItem {
@@ -332,25 +389,25 @@ impl ActivityEngine {
                 app_id: "chrome".into(),
                 app_name: "Chrome".into(),
                 icon_svg: crate::logos::get_logo_img_tag("chrome"),
-                status,
-                status_label: label,
+                status: if active_count > 0 {
+                    ActivityStatus::Active
+                } else {
+                    ActivityStatus::Ready
+                },
+                status_label: speed_label,
                 active_downloads_count: active_count,
                 completed_downloads_count: chrome_jobs.len().saturating_sub(active_count),
                 total_transferred_bytes: total_b,
                 total_transferred_str: format_bytes(total_b),
-                aggregate_speed_bps: if active_count > 0 {
-                    92.4 * 1024.0 * 1024.0
-                } else {
-                    0.0
-                },
-                aggregate_speed_str: if active_count > 0 {
-                    "92.4 MB/s".into()
+                aggregate_speed_bps: real_speed_bps,
+                aggregate_speed_str: if real_speed_bps > 0.0 {
+                    format!("{:.1} MB/s", real_speed_bps / (1024.0 * 1024.0))
                 } else {
                     "0.0 MB/s".into()
                 },
                 short_desc: desc,
-                detection_source: "Chromium Native Downloads & Windows Process".into(),
-                detection_confidence: "High (Verified Process & NTFS Zone ADS)".into(),
+                detection_source: "Chromium Native Messaging & Extension Bridge".into(),
+                detection_confidence: "High (Verified Extension Events & Range Discovery)".into(),
                 source_website: Some("google.com / Direct Web".into()),
                 files: chrome_jobs,
                 last_detected_epoch: current_epoch(),
@@ -756,7 +813,7 @@ mod tests {
 
     #[test]
     fn test_live_detection_toggle_behavior() {
-        let items = ActivityEngine::scan_activities(&[], false, &[]);
+        let items = ActivityEngine::scan_activities(&[], false, &[], &[]);
         assert!(
             items.is_empty(),
             "When live detection is disabled, scan must return empty/disabled"
@@ -765,10 +822,49 @@ mod tests {
 
     #[test]
     fn test_activity_with_running_processes() {
-        let items = ActivityEngine::scan_activities(&[], true, &[]);
+        let items = ActivityEngine::scan_activities(&[], true, &[], &[]);
         assert!(
             !items.is_empty(),
             "When live detection is on, running apps should populate cards"
         );
+    }
+
+    #[test]
+    fn test_browser_items_populate_chrome_activity() {
+        let b_item = crate::browser_bridge::BrowserDownloadItem {
+            id: 1,
+            filename: "Sable-AnkerGames.zip".into(),
+            url: "https://ankergames.net/download/xyz".into(),
+            sanitized_url: "https://ankergames.net/download/xyz".into(),
+            domain: "ankergames.net".into(),
+            target_path: "D:\\OTTER_CHROME_BENCHMARK\\Sable-AnkerGames.zip".into(),
+            mime_type: "application/zip".into(),
+            total_bytes: Some(2040109465),
+            received_bytes: 104857600,
+            state: "in_progress".into(),
+            status: "Eligible for OTTER".into(),
+            engine_status: "Native Browser Download".into(),
+            is_eligible: true,
+            is_otter_managed: false,
+            current_speed_bps: 3.5 * 1024.0 * 1024.0,
+            average_speed_bps: 3.2 * 1024.0 * 1024.0,
+            start_time_ms: 0,
+            last_update_ms: 0,
+            last_bytes: 104857600,
+            last_instant: None,
+            error: None,
+            otter_job_id: None,
+        };
+
+        let items = ActivityEngine::scan_activities(&[], true, &[], &[b_item]);
+        let chrome_card = items
+            .iter()
+            .find(|i| i.app_id == "chrome")
+            .expect("Chrome card must exist");
+        assert_eq!(chrome_card.active_downloads_count, 1);
+        assert_eq!(chrome_card.status_label, "3.5 MB/s");
+        assert_eq!(chrome_card.files.len(), 1);
+        assert_eq!(chrome_card.files[0].filename, "Sable-AnkerGames.zip");
+        assert_eq!(chrome_card.files[0].status, "Eligible for OTTER");
     }
 }

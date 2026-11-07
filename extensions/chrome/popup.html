@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OTTER Browser Bridge</title>
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 16px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #FDFBF7;
+      color: #1F2937;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #E5E7EB;
+      padding-bottom: 10px;
+    }
+    .header h1 {
+      font-size: 16px;
+      margin: 0;
+      font-weight: 700;
+      color: #111827;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .status-online {
+      background: #D1FAE5;
+      color: #065F46;
+    }
+    .status-offline {
+      background: #F3F4F6;
+      color: #6B7280;
+    }
+    .indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-online { background: #10B981; }
+    .dot-offline { background: #9CA3AF; }
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #E5E7EB;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 22px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #D1D5DB;
+      transition: .2s;
+      border-radius: 22px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #3B82F6;
+    }
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+    .desc {
+      font-size: 11px;
+      color: #6B7280;
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+    .footer {
+      font-size: 11px;
+      color: #9CA3AF;
+      text-align: center;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div style="font-size: 20px;">🦦</div>
+    <div>
+      <h1>OTTER Engine</h1>
+      <div id="statusBadge" class="status-badge status-offline">
+        <span id="indicatorDot" class="indicator-dot dot-offline"></span>
+        <span id="statusText">Checking Engine...</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toggle-row">
+      <span>Auto-Accelerate</span>
+      <label class="switch">
+        <input type="checkbox" id="autoHandoffToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="desc">
+      Automatically hand off eligible Chrome downloads to OTTER's multi-stream Range engine on Drive D:.
+    </div>
+  </div>
+
+  <div class="card" style="font-size: 12px; line-height: 1.5;">
+    <strong>Features Active:</strong>
+    <ul style="margin: 6px 0 0 16px; padding: 0; color: #4B5563;">
+      <li>Zero duplicate downloads</li>
+      <li>Automatic HTTP Range discovery</li>
+      <li>Pre-allocated disk storage (No merge)</li>
+      <li>Crash-safe SQLite checkpointing</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    OTTER v0.1.0 • Desktop Integration
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
