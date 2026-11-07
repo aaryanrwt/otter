@@ -1,11 +1,11 @@
 // OTTER v0.1.0 — Browser Integration Background Service Worker
-// Ultra-lightweight, zero-lag interceptor and bridge to the OTTER Rust multi-stream engine.
+// Manages real-time download interception, capability discovery, and automatic multi-stream handoff.
 
 const OTTER_BRIDGE_URL = "http://127.0.0.1:45771";
 let isBridgeConnected = false;
 let autoHandoffEnabled = true;
 
-// Prevent duplicate processing / infinite loops
+// Prevent duplicate processing
 const interceptedIds = new Set();
 
 // Load settings from storage
@@ -13,7 +13,7 @@ chrome.storage.local.get(["autoHandoff"], (result) => {
   autoHandoffEnabled = result.autoHandoff !== undefined ? !!result.autoHandoff : true;
 });
 
-// Periodic heartbeat to verify OTTER desktop application is running (every 1 minute)
+// Periodic heartbeat to verify OTTER desktop application is running
 async function checkBridgeStatus() {
   try {
     const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/status`, { method: "GET" });
@@ -21,8 +21,9 @@ async function checkBridgeStatus() {
       isBridgeConnected = true;
       chrome.action.setBadgeText({ text: "ON" });
       chrome.action.setBadgeBackgroundColor({ color: "#10B981" }); // Emerald
+      scanAndAccelerateActiveDownloads();
     } else {
-      throw new Error("Not OK");
+      throw new Error("Bridge not OK");
     }
   } catch (err) {
     isBridgeConnected = false;
@@ -31,13 +32,35 @@ async function checkBridgeStatus() {
   }
 }
 
-// Initial check and alarm (every 1 minute to save CPU)
+// Check and automatically accelerate any existing in-progress downloads
+async function scanAndAccelerateActiveDownloads() {
+  if (!isBridgeConnected || !autoHandoffEnabled) return;
+  chrome.downloads.search({ state: "in_progress" }, (items) => {
+    if (items) {
+      for (const item of items) {
+        if (!interceptedIds.has(item.id)) {
+          handleBrowserDownload(item);
+        }
+      }
+    }
+  });
+}
+
+// Initial check and recurring alarms
 checkBridgeStatus();
-chrome.alarms.create("otterHeartbeat", { periodInMinutes: 1.0 });
+chrome.alarms.create("otterHeartbeat", { periodInMinutes: 0.5 });
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === "otterHeartbeat") {
     checkBridgeStatus();
   }
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  checkBridgeStatus();
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  checkBridgeStatus();
 });
 
 // Sanitize URL for privacy: strip session nonces, tokens, and sensitive query strings
@@ -56,15 +79,15 @@ function sanitizeUrlForAudit(rawUrl) {
   }
 }
 
-// Handler for browser downloads - instantly pauses single stream & hands off to OTTER
+// Handler for browser downloads - instantly pauses Chrome single stream & hands off to OTTER
 async function handleBrowserDownload(item) {
   if (!item || !item.url) return;
   if (interceptedIds.has(item.id)) return;
   interceptedIds.add(item.id);
 
-  console.log("[OTTER Extension] Intercepting download:", item.id, item.filename);
+  console.log("[OTTER Extension] Intercepting download for multi-stream acceleration:", item.id, item.filename);
 
-  // Instantly pause Chrome's single connection to halt slow transfer
+  // Instantly pause Chrome's single connection to avoid bandwidth competition
   if (!item.paused && item.state === "in_progress") {
     chrome.downloads.pause(item.id, () => {
       if (chrome.runtime.lastError) {}
@@ -93,17 +116,20 @@ async function handleBrowserDownload(item) {
       };
 
       try {
-        await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/created`, {
+        const res = await fetch(`${OTTER_BRIDGE_URL}/api/browser/download/created`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload)
         });
-        // Keep Chrome native single stream paused
-        chrome.downloads.pause(resolvedItem.id, () => {
-          if (chrome.runtime.lastError) {}
-        });
+
+        if (res.ok) {
+          // Keep Chrome single-stream paused so only OTTER multi-stream downloads
+          chrome.downloads.pause(resolvedItem.id, () => {
+            if (chrome.runtime.lastError) {}
+          });
+        }
       } catch (e) {
-        console.warn("[OTTER Extension] Bridge connection failed:", e.message);
+        console.warn("[OTTER Extension] Could not contact OTTER Bridge:", e.message);
       }
     });
   }, 300);
@@ -114,7 +140,7 @@ chrome.downloads.onCreated.addListener((item) => {
   handleBrowserDownload(item);
 });
 
-// Listen for download state changes (only complete/interrupt, not on every byte!)
+// Listen for download state changes (only complete/interrupt terminal transitions)
 chrome.downloads.onChanged.addListener((delta) => {
   if (delta.state && (delta.state.current === "complete" || delta.state.current === "interrupted")) {
     fetch(`${OTTER_BRIDGE_URL}/api/browser/download/changed`, {

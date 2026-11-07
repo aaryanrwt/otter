@@ -268,8 +268,17 @@ impl BrowserBridge {
 
         let mut item = BrowserDownloadItem {
             id,
-            filename: if filename.is_empty() {
-                "download".to_string()
+            filename: if filename.is_empty()
+                || filename == "download"
+                || filename.ends_with(".crdownload")
+                || filename.starts_with("Unconfirmed")
+            {
+                let clean_fn = engine::extract_filename(&reqwest::header::HeaderMap::new(), &active_download_url);
+                if clean_fn.ends_with(".crdownload") || clean_fn.starts_with("Unconfirmed") {
+                    filename
+                } else {
+                    clean_fn
+                }
             } else {
                 filename
             },
