@@ -314,8 +314,7 @@ function mergeActiveDownloads(otterItems, chromeItems) {
         speedHistoryMap.set(c.id, { bytes: rx, time: now, speedBps: 0 });
       }
 
-      // Auto-trigger handoff to ensure Chrome single stream is stopped
-      chrome.runtime.sendMessage({ action: "FORCE_HANDOFF", downloadId: c.id });
+
 
       const isPaused = !!c.paused;
       map.set(c.id, {
@@ -366,25 +365,7 @@ function renderActiveDownloads(items) {
 
     const sizeStr = item.total_bytes ? formatBytes(item.total_bytes) : formatBytes(item.received_bytes);
 
-    // Formatted real speed
-    let speedStr = "Active";
-    if (item.speed_bps > 0) {
-      speedStr = `${(item.speed_bps / (1024 * 1024)).toFixed(1)} MB/s`;
-    } else if (item.status.includes("Paused")) {
-      speedStr = "Paused";
-    }
 
-    // Accurate ETA calculation
-    let etaStr = "Calculating...";
-    if (item.estimatedEndTime) {
-      const remSec = Math.max(0, Math.round((new Date(item.estimatedEndTime).getTime() - Date.now()) / 1000));
-      etaStr = formatDuration(remSec) + " left";
-    } else if (item.speed_bps > 0 && item.total_bytes && item.total_bytes > item.received_bytes) {
-      const remSec = Math.round((item.total_bytes - item.received_bytes) / item.speed_bps);
-      etaStr = formatDuration(remSec) + " left";
-    } else {
-      etaStr = item.status.includes("Paused") ? "Paused" : "In Progress";
-    }
 
     const iconSvg = getMediaIconSvg(item.filename, item.domain);
     const isPaused = item.is_paused || (item.status && item.status.toLowerCase().includes("paused"));
