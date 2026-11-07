@@ -7,6 +7,12 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use types::ProgressSnapshot;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+fn default_true() -> bool { true }
+fn default_16() -> usize { 16 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuiSettings {
     #[serde(default)]
@@ -19,6 +25,24 @@ pub struct GuiSettings {
     pub live_detection: bool,
     pub theme: String,
     pub language: String,
+    #[serde(default = "default_true")]
+    pub auto_detect_urls: bool,
+    #[serde(default = "default_true")]
+    pub show_detection_preview: bool,
+    #[serde(default = "default_true")]
+    pub aimd_adaptive_concurrency: bool,
+    #[serde(default = "default_16")]
+    pub max_connections_per_host: usize,
+    #[serde(default = "default_true")]
+    pub auto_verify_sha256: bool,
+    #[serde(default = "default_true")]
+    pub crash_recovery: bool,
+    #[serde(default = "default_true")]
+    pub notify_on_completed: bool,
+    #[serde(default = "default_true")]
+    pub notify_on_failed: bool,
+    #[serde(default)]
+    pub proxy_url: Option<String>,
 }
 
 impl Default for GuiSettings {
@@ -33,13 +57,22 @@ impl Default for GuiSettings {
         Self {
             user_name: String::new(),
             default_download_dir: default_dir,
-            concurrent_downloads: 5,
+            concurrent_downloads: 16,
             bandwidth_limit_mb_s: None,
             start_with_windows: false,
             minimize_to_tray: true,
             live_detection: true,
             theme: "light".to_string(),
             language: "English".to_string(),
+            auto_detect_urls: true,
+            show_detection_preview: true,
+            aimd_adaptive_concurrency: true,
+            max_connections_per_host: 64,
+            auto_verify_sha256: true,
+            crash_recovery: true,
+            notify_on_completed: true,
+            notify_on_failed: true,
+            proxy_url: None,
         }
     }
 }
@@ -57,13 +90,19 @@ impl GuiSettings {
         default_s
     }
 
+    /// Atomic write to prevent partial file writes
     pub fn save(&self) -> Result<()> {
         let path = Self::settings_path();
         if let Some(parent) = path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
+        let temp_path = path.with_extension("tmp");
         let data = serde_json::to_string_pretty(self)?;
-        std::fs::write(&path, data)?;
+        std::fs::write(&temp_path, data)?;
+        let _ = std::fs::rename(&temp_path, &path);
+
+        // Update Windows autostart registry key if toggled
+        let _ = update_windows_autostart(self.start_with_windows);
         Ok(())
     }
 
@@ -72,6 +111,27 @@ impl GuiSettings {
             .unwrap_or_else(|_| "C:\\Users\\Default\\AppData\\Local".to_string());
         PathBuf::from(local_app_data).join("otter").join("gui_settings.json")
     }
+}
+
+pub fn update_windows_autostart(enable: bool) -> Result<()> {
+    #[cfg(windows)]
+    {
+        if let Ok(exe_path) = std::env::current_exe() {
+            let exe_str = exe_path.to_string_lossy().to_string();
+            if enable {
+                let _ = std::process::Command::new("reg")
+                    .args(&["add", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Otter", "/t", "REG_SZ", "/d", &format!("\"{}\"", exe_str), "/f"])
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .output();
+            } else {
+                let _ = std::process::Command::new("reg")
+                    .args(&["delete", "HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run", "/v", "Otter", "/f"])
+                    .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                    .output();
+            }
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,13 +159,14 @@ pub struct AppState {
     pub manifest: Arc<ManifestStore>,
     pub active_snapshots: Arc<Mutex<std::collections::HashMap<String, ProgressSnapshot>>>,
     pub cancellation_tokens: Arc<Mutex<std::collections::HashMap<String, tokio_util::sync::CancellationToken>>>,
+    pub thumbnails: Arc<Mutex<std::collections::HashMap<String, String>>>,
     pub settings: Arc<Mutex<GuiSettings>>,
 }
 
 impl AppState {
     pub fn new() -> Result<Self> {
         let manifest = Arc::new(ManifestStore::open_default()?);
-        let manager = Arc::new(DownloadManager::new(manifest.clone())?);
+        let manager = Arc::new(DownloadManager::with_max_host_connections(manifest.clone(), 64)?);
         let settings = Arc::new(Mutex::new(GuiSettings::load()));
 
         Ok(Self {
@@ -113,6 +174,7 @@ impl AppState {
             manifest,
             active_snapshots: Arc::new(Mutex::new(std::collections::HashMap::new())),
             cancellation_tokens: Arc::new(Mutex::new(std::collections::HashMap::new())),
+            thumbnails: Arc::new(Mutex::new(std::collections::HashMap::new())),
             settings,
         })
     }

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Otter</title>
   <link rel="stylesheet" href="style.css">
+  <!-- __OTTER_LOGOS_SCRIPT__ -->
 </head>
 <body>
   <!-- Onboarding / Welcome Name Modal (shown if name not provided) -->
@@ -89,14 +90,6 @@
               <line x1="12" y1="17" x2="12" y2="21"/>
             </svg>
             <span>Library</span>
-          </button>
-
-          <button class="nav-item" data-view="view-engine">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-            </svg>
-            <span>Engine</span>
           </button>
 
           <button class="nav-item" data-view="view-settings">
@@ -199,9 +192,9 @@
             </div>
             <div class="page-header-actions">
               <div class="search-wrap">
-                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="11" cy="11" r="8"/>
-                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="7.5"/>
+                  <line x1="21" y1="21" x2="16.5" y2="16.5"/>
                 </svg>
                 <input type="text" class="search-input" id="search-downloads-input" placeholder="Search downloads...">
               </div>
@@ -249,111 +242,54 @@
             </div>
           </div>
 
-          <!-- Activity Cards with Real SVG Brand Icons (Zero Emojis) -->
-          <div class="activity-cards-list">
-            <div class="activity-card">
-              <div class="act-icon-brand chrome-icon">
-                <svg viewBox="0 0 48 48" class="brand-svg-icon">
-                  <circle cx="24" cy="24" r="10" fill="#fff"/>
-                  <circle cx="24" cy="24" r="8" fill="#1a73e8"/>
-                  <path fill="#ea4335" d="M24 4c8.4 0 15.6 5.2 18.5 12.6l-11 19C30.2 37.8 27.2 39 24 39c-8.3 0-15-6.7-15-15 0-1.4.2-2.7.5-4h21.9C29.6 15.7 26.9 14 24 14V4z"/>
-                  <path fill="#fbbc05" d="M11.5 24c0-3.3 1.1-6.4 3-8.9L3.4 9.8C1.3 13.8 0 18.6 0 24c0 10.3 6.5 19.1 15.6 22.4l11-19c-2.3 1.1-4.9 1.6-7.6 1.6-6 0-11.2-3.8-13.5-9z"/>
-                  <path fill="#34a853" d="M24 44c5.3 0 10.2-1.8 14.1-4.9l-11-19c-.9 1.7-2.3 3.1-4.1 4-2.8 1.4-6.1 1.4-8.8 0L3.4 38.2C8.7 42.6 15.9 44 24 44z"/>
-                </svg>
-              </div>
-              <div class="act-info">
-                <span class="act-name">Chrome</span>
-                <span class="act-sub">Direct web downloads • Browser integration active</span>
-              </div>
-              <div class="act-speed-badge">
-                <span class="speed-bars">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="3" y="16" width="3" height="5" rx="1"/><rect x="9" y="11" width="3" height="10" rx="1"/><rect x="15" y="6" width="3" height="15" rx="1"/></svg>
-                </span>
-                <span id="act-speed-chrome">Ready</span>
-              </div>
-              <span class="chevron">›</span>
-            </div>
+          <!-- Dynamic Activity Cards (Rendered from real system introspection) -->
+          <div class="activity-cards-list" id="activity-cards-container">
+            <!-- Dynamic application cards rendered by app.js -->
+          </div>
 
-            <div class="activity-card">
-              <div class="act-icon-brand steam-icon">
-                <svg viewBox="0 0 24 24" class="brand-svg-icon" fill="currentColor">
-                  <path d="M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.005.105.005.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.704L.445 14.85C1.848 20.098 6.64 24 12.001 24c6.627 0 12-5.373 12-12S18.605 0 11.979 0z"/>
-                </svg>
+          <!-- Activity Detail Modal / Drawer -->
+          <div class="modal-backdrop" id="activityDetailBackdrop" style="display: none;">
+            <div class="modal-card activity-detail-modal">
+              <div class="modal-header">
+                <div class="detail-header-left">
+                  <div class="detail-brand-icon-wrap" id="detail-app-icon"></div>
+                  <div class="detail-title-col">
+                    <h2 class="modal-title" id="detail-app-name">Application</h2>
+                    <span class="detail-status-pill" id="detail-app-status">Standby</span>
+                  </div>
+                </div>
+                <button class="modal-close-btn" id="btn-close-activity-detail">✕</button>
               </div>
-              <div class="act-info">
-                <span class="act-name">Steam</span>
-                <span class="act-sub">Steam Store protocol handoff & library detection</span>
-              </div>
-              <div class="act-speed-badge">
-                <span class="speed-bars">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="3" y="16" width="3" height="5" rx="1"/><rect x="9" y="11" width="3" height="10" rx="1"/><rect x="15" y="6" width="3" height="15" rx="1"/></svg>
-                </span>
-                <span>Standby</span>
-              </div>
-              <span class="chevron">›</span>
-            </div>
 
-            <div class="activity-card">
-              <div class="act-icon-brand epic-icon">
-                <svg viewBox="0 0 24 24" class="brand-svg-icon" fill="currentColor">
-                  <path d="M4 1.5h16L22 17l-10 5.5L2 17 4 1.5zm13.5 13.5l1.2-10.5H5.3l1.2 10.5 5.5 3 5.5-3zM8 6h8v2H10v2h5v2h-5v2h6v2H8V6z"/>
-                </svg>
-              </div>
-              <div class="act-info">
-                <span class="act-name">Epic Games</span>
-                <span class="act-sub">Epic Games Store product URLs & launcher integration</span>
-              </div>
-              <div class="act-speed-badge">
-                <span class="speed-bars">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="3" y="16" width="3" height="5" rx="1"/><rect x="9" y="11" width="3" height="10" rx="1"/><rect x="15" y="6" width="3" height="15" rx="1"/></svg>
-                </span>
-                <span>Standby</span>
-              </div>
-              <span class="chevron">›</span>
-            </div>
+              <div class="modal-body activity-modal-body">
+                <div class="detail-meta-grid">
+                  <div class="detail-meta-card">
+                    <span class="meta-label">Detection Method</span>
+                    <span class="meta-val" id="detail-detection-method">-</span>
+                  </div>
+                  <div class="detail-meta-card">
+                    <span class="meta-label">Evidence & Confidence</span>
+                    <span class="meta-val" id="detail-detection-confidence">-</span>
+                  </div>
+                  <div class="detail-meta-card">
+                    <span class="meta-label">Active Transfers</span>
+                    <span class="meta-val" id="detail-active-count">0</span>
+                  </div>
+                  <div class="detail-meta-card">
+                    <span class="meta-label">Aggregate Speed</span>
+                    <span class="meta-val" id="detail-speed">0.0 MB/s</span>
+                  </div>
+                </div>
 
-            <div class="activity-card">
-              <div class="act-icon-brand hf-icon">
-                <svg viewBox="0 0 24 24" class="brand-svg-icon" fill="none">
-                  <circle cx="12" cy="12" r="10" fill="#FFD21E"/>
-                  <path d="M8 10a1.5 1.5 0 0 1 3 0M13 10a1.5 1.5 0 0 1 3 0" stroke="#000" stroke-width="2" stroke-linecap="round"/>
-                  <path d="M8 15c1.5 2 6.5 2 8 0" stroke="#000" stroke-width="2" stroke-linecap="round"/>
-                  <ellipse cx="6" cy="14" rx="2" ry="3" fill="#FFA000"/>
-                  <ellipse cx="18" cy="14" rx="2" ry="3" fill="#FFA000"/>
-                </svg>
+                <h3 class="detail-section-title">Detected Download Transfers</h3>
+                <div class="detail-files-list" id="detail-files-container">
+                  <!-- Populated with real files or honest source unknown notification -->
+                </div>
               </div>
-              <div class="act-info">
-                <span class="act-name">Hugging Face</span>
-                <span class="act-sub">Multi-stream Range model weights & dataset shards</span>
-              </div>
-              <div class="act-speed-badge">
-                <span class="speed-bars">
-                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><rect x="3" y="16" width="3" height="5" rx="1"/><rect x="9" y="11" width="3" height="10" rx="1"/><rect x="15" y="6" width="3" height="15" rx="1"/></svg>
-                </span>
-                <span id="act-speed-hf">AIMD Active</span>
-              </div>
-              <span class="chevron">›</span>
-            </div>
-
-            <div class="activity-card">
-              <div class="act-icon-brand gh-icon">
-                <svg viewBox="0 0 24 24" class="brand-svg-icon" fill="currentColor">
-                  <path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
-                </svg>
-              </div>
-              <div class="act-info">
-                <span class="act-name">GitHub / Ollama</span>
-                <span class="act-sub">Physical GGUF layer blobs & release assets</span>
-              </div>
-              <div class="act-speed-badge completed-badge">
-                <span class="checkmark-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></span>
-                <span>Active</span>
-              </div>
-              <span class="chevron">›</span>
             </div>
           </div>
 
-          <!-- Mascot Bottom Left -->
+          <!-- Mascot Bottom Left (Matching Reference media_1793983231510_211bee93.jpg) -->
           <div class="mascot-bottom-left">
             <img src="__MASCOT_CHEERFUL__" alt="Cheerful Otter Popping Out of Pink Box" class="mascot-cheerful">
           </div>
@@ -385,255 +321,386 @@
           </div>
         </section>
 
-        <!-- 5. ENGINE TELEMETRY VIEW -->
-        <section class="view" id="view-engine">
-          <div class="page-header-row">
-            <div class="page-title-col">
-              <h1 class="page-title">Engine <span class="pink-dot">.</span></h1>
-              <p class="page-subtitle">Real-time telemetry, SQLite WAL state, and Win32 hardware inspection.</p>
-            </div>
-            <button class="btn-primary" id="btn-run-doctor">
-              <span>Run Diagnostics</span>
-            </button>
-          </div>
-
-          <!-- Live Telemetry Cards -->
-          <div class="engine-cards-grid">
-            <div class="engine-card">
-              <span class="eng-label">Adaptive Concurrency</span>
-              <span class="eng-val" id="eng-aimd-status">Active (AIMD)</span>
-              <p class="eng-desc">Additive Increase / Multiplicative Decrease congestion control prevents CDN rate-limits.</p>
-            </div>
-
-            <div class="engine-card">
-              <span class="eng-label">Active Sockets</span>
-              <span class="eng-val" id="eng-connections">0</span>
-              <p class="eng-desc">Dynamic HTTP/1.1 TCP connections bounded by host semaphore.</p>
-            </div>
-
-            <div class="engine-card">
-              <span class="eng-label">SQLite Manifest</span>
-              <span class="eng-val" id="eng-wal-status">WAL Mode</span>
-              <p class="eng-desc">Crash-durable checkpointing with zero lock contention.</p>
-            </div>
-
-            <div class="engine-card">
-              <span class="eng-label">Disk Preallocation</span>
-              <span class="eng-val" id="eng-prealloc-status">SetFileValidData</span>
-              <p class="eng-desc">Instantaneous sparse reservation on NTFS without zeroing stalls.</p>
-            </div>
-          </div>
-
-          <!-- Hardware & Host Introspection -->
-          <h2 class="section-title" style="margin-top: 32px; margin-bottom: 16px;">Host Machine Specs (Physical Introspection)</h2>
-          <div class="specs-grid">
-            <div class="spec-item">
-              <span class="spec-k">Device Name:</span>
-              <span class="spec-v" id="spec-device-name">Inspecting...</span>
-            </div>
-            <div class="spec-item">
-              <span class="spec-k">CPU Cores:</span>
-              <span class="spec-v" id="spec-cpu-cores">Inspecting...</span>
-            </div>
-            <div class="spec-item">
-              <span class="spec-k">Physical RAM:</span>
-              <span class="spec-v" id="spec-ram">Inspecting...</span>
-            </div>
-            <div class="spec-item">
-              <span class="spec-k">Free Disk Space:</span>
-              <span class="spec-v" id="spec-disk-free">Inspecting...</span>
-            </div>
-          </div>
-
-          <!-- Diagnostic Results Box -->
-          <div class="doctor-results-box" id="doctor-results" style="display: none; margin-top: 24px;">
-            <h3 class="section-title" style="font-size: 16px; margin-bottom: 12px;">Doctor Diagnostic Report</h3>
-            <div id="doctor-items-list" class="doctor-items-list"></div>
-          </div>
-        </section>
-
-        <!-- 6. SETTINGS VIEW -->
+        <!-- 5. SETTINGS VIEW -->
         <section class="view" id="view-settings">
-          <div class="settings-layout">
-            <!-- Settings Subnav -->
+          <!-- Settings Page Header with Sleeping Mascot and 'z z z' -->
+          <div class="settings-header-row">
+            <div class="settings-title-col">
+              <h1 class="page-title">Settings <span class="pink-dot">.</span></h1>
+              <p class="page-subtitle">Customize how Otter works for you.</p>
+            </div>
+            <div class="settings-mascot-wrap">
+              <div class="zzz-container">
+                <span class="zzz z3">z</span>
+                <span class="zzz z2">z</span>
+                <span class="zzz z1">z</span>
+              </div>
+              <img src="__MASCOT_SLEEPING__" alt="Sleeping Otter on Pink Paw Pillow" class="mascot-sleeping-pill">
+            </div>
+          </div>
+
+          <!-- Settings Main Two Columns -->
+          <div class="settings-two-col">
+            <!-- Left Subnav (8 Categories) -->
             <div class="settings-subnav">
-              <div class="settings-header-col">
-                <h1 class="view-title">Settings <span class="pink-dot">.</span></h1>
-                <p class="view-subtitle">Customize how Otter works for you.</p>
-              </div>
-              <button class="subnav-btn active" data-settings-pane="pane-general">General</button>
-              <button class="subnav-btn" data-settings-pane="pane-detection">Detection</button>
-              <button class="subnav-btn" data-settings-pane="pane-engine">Download Engine</button>
-              <button class="subnav-btn" data-settings-pane="pane-storage">Storage</button>
-              <button class="subnav-btn" data-settings-pane="pane-network">Network</button>
-              <button class="subnav-btn" data-settings-pane="pane-appearance">Appearance</button>
-              <button class="subnav-btn" data-settings-pane="pane-notifications">Notifications</button>
-              <button class="subnav-btn" data-settings-pane="pane-advanced">Advanced</button>
+              <button class="subnav-btn active" data-settings-pane="pane-general">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span>General</span>
+              </button>
+
+              <button class="subnav-btn" data-settings-pane="pane-detection">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M5 12.55a11 11 0 0 1 14.08 0"/>
+                  <path d="M1.42 9a16 16 0 0 1 21.16 0"/>
+                  <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+                  <line x1="12" y1="20" x2="12.01" y2="20" stroke-width="3"/>
+                </svg>
+                <span>Detection</span>
+              </button>
+
+              <button class="subnav-btn" data-settings-pane="pane-engine">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+                </svg>
+                <span>Download Engine</span>
+              </button>
+
+              <button class="subnav-btn" data-settings-pane="pane-storage">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+                <span>Storage</span>
+              </button>
+
+              <button class="subnav-btn" data-settings-pane="pane-network">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="2" y1="12" x2="22" y2="12"/>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                <span>Network</span>
+              </button>
+
+              <button class="subnav-btn" data-settings-pane="pane-appearance">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/>
+                  <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/>
+                  <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>
+                  <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/>
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.563-2.512 5.563-5.563C22 6.5 17.5 2 12 2z"/>
+                </svg>
+                <span>Appearance</span>
+              </button>
+
+              <button class="subnav-btn" data-settings-pane="pane-notifications">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                <span>Notifications</span>
+              </button>
+
+              <button class="subnav-btn" data-settings-pane="pane-advanced">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+                <span>Advanced</span>
+              </button>
             </div>
 
-            <!-- Settings Content Panes -->
-            <div class="settings-pane-container">
-              <!-- Pane 1: General -->
+            <!-- Right Content Panes -->
+            <div class="settings-content-col">
+              <!-- Pane 1: General (Exact Match to Reference Screenshot) -->
               <div class="settings-pane active" id="pane-general">
-                <h3 class="settings-section-title">General</h3>
+                <!-- Card 1: General -->
+                <div class="settings-card">
+                  <h3 class="card-title">General</h3>
 
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Your Name</span>
-                    <span class="setting-desc">Personalize your greeting and workspace.</span>
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Start with Windows</span>
+                      <span class="setting-sub">Launch Otter automatically when you turn on your PC.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-start-with-windows">
+                      <span class="slider round"></span>
+                    </label>
                   </div>
-                  <div class="setting-inline-input">
-                    <input type="text" class="setting-input" id="setting-user-name" placeholder="Enter your name...">
-                    <button class="btn-subtle" id="btn-save-user-name">Save</button>
-                  </div>
-                </div>
-                
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Start with Windows</span>
-                    <span class="setting-desc">Launch Otter automatically when you turn on your PC.</span>
-                  </div>
-                  <label class="switch">
-                    <input type="checkbox" id="set-start-with-windows">
-                    <span class="slider round"></span>
-                  </label>
-                </div>
 
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Minimize to system tray</span>
-                    <span class="setting-desc">Keep Otter running in the background when closing the window.</span>
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Minimize to system tray</span>
+                      <span class="setting-sub">Keep Otter running in the background.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-minimize-to-tray" checked>
+                      <span class="slider round"></span>
+                    </label>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" id="set-minimize-to-tray" checked>
-                    <span class="slider round"></span>
-                  </label>
-                </div>
 
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Language</span>
-                  </div>
-                  <select class="setting-select" id="set-language">
-                    <option value="English">English</option>
-                  </select>
-                </div>
-
-                <h3 class="settings-section-title" style="margin-top: 24px;">Download Behavior</h3>
-
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Default download location</span>
-                  </div>
-                  <div class="setting-inline-input">
-                    <input type="text" class="setting-input" id="set-download-dir" readonly>
-                    <button class="btn-subtle" id="btn-change-download-dir">Change</button>
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Language</span>
+                    </div>
+                    <select class="pill-select" id="set-language">
+                      <option value="English" selected>English</option>
+                      <option value="Spanish">Spanish</option>
+                      <option value="German">German</option>
+                      <option value="French">French</option>
+                    </select>
                   </div>
                 </div>
 
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Concurrent downloads</span>
-                    <span class="setting-desc">Number of files to download at the same time.</span>
-                  </div>
-                  <select class="setting-select" id="set-concurrent-downloads">
-                    <option value="2">2</option>
-                    <option value="4">4</option>
-                    <option value="5" selected>5</option>
-                    <option value="8">8</option>
-                    <option value="16">16</option>
-                  </select>
-                </div>
+                <!-- Card 2: Download Behavior -->
+                <div class="settings-card">
+                  <h3 class="card-title">Download Behavior</h3>
 
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Bandwidth limit</span>
-                    <span class="setting-desc">Limit total download speed across all active connections.</span>
+                  <div class="setting-row folder-setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Default download location</span>
+                      <div class="folder-display">
+                        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" class="folder-svg">
+                          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span id="lbl-download-dir" class="folder-path">D:\Downloads\Otter</span>
+                      </div>
+                    </div>
+                    <button class="pill-btn-outline" id="btn-change-folder">Change</button>
                   </div>
-                  <select class="setting-select" id="set-bandwidth-limit">
-                    <option value="none">No limit</option>
-                    <option value="10">10 MB/s</option>
-                    <option value="25">25 MB/s</option>
-                    <option value="50">50 MB/s</option>
-                  </select>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Concurrent downloads</span>
+                      <span class="setting-sub">Number of files to download at the same time.</span>
+                    </div>
+                    <select class="pill-select" id="set-concurrent-downloads">
+                      <option value="2">2</option>
+                      <option value="3">3</option>
+                      <option value="4">4</option>
+                      <option value="5" selected>5</option>
+                      <option value="8">8</option>
+                      <option value="16">16</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Bandwidth limit</span>
+                      <span class="setting-sub">Limit total download speed.</span>
+                    </div>
+                    <select class="pill-select" id="set-bandwidth-limit">
+                      <option value="none" selected>No limit</option>
+                      <option value="5">5 MB/s</option>
+                      <option value="10">10 MB/s</option>
+                      <option value="25">25 MB/s</option>
+                      <option value="50">50 MB/s</option>
+                      <option value="100">100 MB/s</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <!-- Other Panes (Detection, Storage, Network, etc.) -->
+              <!-- Pane 2: Detection -->
               <div class="settings-pane" id="pane-detection">
-                <h3 class="settings-section-title">Detection</h3>
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Automatic Clipboard URL Detection</span>
-                    <span class="setting-desc">Prompt to download when copying media, model, or dataset links.</span>
+                <div class="settings-card">
+                  <h3 class="card-title">Clipboard & Live Detection</h3>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Automatic Clipboard Detection</span>
+                      <span class="setting-sub">Prompt to download when copying media, model, or dataset links.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-live-detection" checked>
+                      <span class="slider round"></span>
+                    </label>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" checked>
-                    <span class="slider round"></span>
-                  </label>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Show Detection Preview</span>
+                      <span class="setting-sub">Inspect stream count, resumability, and file metadata before starting.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-detection-preview" checked>
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
+              <!-- Pane 3: Download Engine -->
               <div class="settings-pane" id="pane-engine">
-                <h3 class="settings-section-title">Download Engine</h3>
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Dynamic AIMD Rate Control</span>
-                    <span class="setting-desc">Automatically scale streams based on bandwidth headroom.</span>
+                <div class="settings-card">
+                  <h3 class="card-title">Concurrency & Congestion Control</h3>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Dynamic AIMD Scaling</span>
+                      <span class="setting-sub">Additive Increase / Multiplicative Decrease adapts streams to CDN limits.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-aimd" checked>
+                      <span class="slider round"></span>
+                    </label>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" checked>
-                    <span class="slider round"></span>
-                  </label>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Automatic SHA-256 Verification</span>
+                      <span class="setting-sub">Compute cryptographic hash upon completion and match against manifest.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-auto-verify" checked>
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
+              <!-- Pane 4: Storage -->
               <div class="settings-pane" id="pane-storage">
-                <h3 class="settings-section-title">Storage</h3>
-                <p class="setting-desc">Otter writes directly to preallocated NTFS sparse offsets, eliminating post-download merge phases.</p>
+                <div class="settings-card">
+                  <h3 class="card-title">Storage & Disk Allocation</h3>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">NTFS Instant Preallocation</span>
+                      <span class="setting-sub">Uses SetFileValidData on Windows to allocate disk space instantaneously without zero-fill stalls.</span>
+                    </div>
+                    <span class="setting-status-pill">Active</span>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Crash-Durable Recovery</span>
+                      <span class="setting-sub">SQLite WAL mode automatically resumes interrupted segments upon reboot.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-crash-recovery" checked>
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
+                </div>
               </div>
 
+              <!-- Pane 5: Network -->
               <div class="settings-pane" id="pane-network">
-                <h3 class="settings-section-title">Network</h3>
-                <p class="setting-desc">Per-host connection semaphore defaults to 16 independent TCP sockets.</p>
+                <div class="settings-card">
+                  <h3 class="card-title">Network & Sockets</h3>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Max Connections per Host</span>
+                      <span class="setting-sub">Global host connection semaphore ceiling to avoid CDN IP bans.</span>
+                    </div>
+                    <select class="pill-select" id="set-max-connections">
+                      <option value="8">8 sockets</option>
+                      <option value="16" selected>16 sockets</option>
+                      <option value="24">24 sockets</option>
+                      <option value="32">32 sockets</option>
+                    </select>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Independent HTTP/1.1 Sockets</span>
+                      <span class="setting-sub">Bypasses HTTP/2 Head-of-Line blocking over high-latency WAN links.</span>
+                    </div>
+                    <span class="setting-status-pill">Enforced</span>
+                  </div>
+                </div>
               </div>
 
+              <!-- Pane 6: Appearance -->
               <div class="settings-pane" id="pane-appearance">
-                <h3 class="settings-section-title">Appearance</h3>
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Theme</span>
-                    <span class="setting-desc">Switch between Warm Ivory and Dark Mode.</span>
+                <div class="settings-card">
+                  <h3 class="card-title">Interface Appearance</h3>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Theme</span>
+                      <span class="setting-sub">Choose between Warm Ivory and Dark Mode.</span>
+                    </div>
+                    <select class="pill-select" id="set-theme">
+                      <option value="light" selected>Warm Ivory (Default)</option>
+                      <option value="dark">Dark</option>
+                    </select>
                   </div>
-                  <select class="setting-select" id="set-theme">
-                    <option value="light">Warm Ivory (Default)</option>
-                    <option value="dark">Dark</option>
-                  </select>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Accent Palette</span>
+                      <span class="setting-sub">Otter signature warm rose and pink accents.</span>
+                    </div>
+                    <span class="setting-status-pill" style="background-color: #FCE7F3; color: #DB2777;">Otter Rose</span>
+                  </div>
                 </div>
               </div>
 
+              <!-- Pane 7: Notifications -->
               <div class="settings-pane" id="pane-notifications">
-                <h3 class="settings-section-title">Notifications</h3>
-                <div class="setting-item-row">
-                  <div class="setting-text">
-                    <span class="setting-name">Notify on download completion</span>
+                <div class="settings-card">
+                  <h3 class="card-title">Notifications</h3>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Notify on download completion</span>
+                      <span class="setting-sub">Show Windows desktop toast when downloads complete.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-notify-completed" checked>
+                      <span class="slider round"></span>
+                    </label>
                   </div>
-                  <label class="switch">
-                    <input type="checkbox" checked>
-                    <span class="slider round"></span>
-                  </label>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Notify on download failure</span>
+                      <span class="setting-sub">Show desktop toast when a network error or CDN reset occurs.</span>
+                    </div>
+                    <label class="switch">
+                      <input type="checkbox" id="set-notify-failed" checked>
+                      <span class="slider round"></span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
+              <!-- Pane 8: Advanced -->
               <div class="settings-pane" id="pane-advanced">
-                <h3 class="settings-section-title">Advanced</h3>
-                <p class="setting-desc">Version: Otter 0.1.0 (Rust 2024 Edition, Native Win32)</p>
-              </div>
-            </div>
+                <div class="settings-card">
+                  <h3 class="card-title">System & Diagnostics</h3>
 
-            <!-- Sleeping Mascot Top Right -->
-            <div class="mascot-settings-top">
-              <img src="__MASCOT_SLEEPING__" alt="Sleeping Otter on Pink Paw Pillow" class="mascot-sleeping">
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Engine Version</span>
+                      <span class="setting-sub">Otter v0.1.0 (Rust 2024 Edition, Native Win32)</span>
+                    </div>
+                    <span class="setting-status-pill">v0.1.0</span>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Configuration Directory</span>
+                      <span class="setting-sub">Stored atomically in %LOCALAPPDATA%\otter\gui_settings.json.</span>
+                    </div>
+                    <button class="pill-btn-outline" id="btn-open-settings-dir">Open Folder</button>
+                  </div>
+
+                  <div class="setting-row">
+                    <div class="setting-text">
+                      <span class="setting-title">Reset All Settings</span>
+                      <span class="setting-sub">Restore all settings to factory defaults without deleting files.</span>
+                    </div>
+                    <button class="pill-btn-outline" id="btn-reset-settings" style="color: #EF4444; border-color: #FCA5A5;">Reset Defaults</button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -645,36 +712,66 @@
   <div class="modal-backdrop" id="urlModalBackdrop" style="display: none;">
     <div class="modal-box">
       <div class="modal-header">
-        <h2 class="modal-title">Add Download</h2>
+        <h2 class="modal-title">
+          <svg class="paw-icon" viewBox="0 0 24 24" fill="currentColor" style="color: var(--accent-pink); width: 18px; height: 18px;">
+            <ellipse cx="12" cy="15" rx="4.5" ry="4"/>
+            <ellipse cx="6.5" cy="10" rx="2.2" ry="3"/>
+            <ellipse cx="10" cy="7" rx="2.2" ry="3"/>
+            <ellipse cx="14" cy="7" rx="2.2" ry="3"/>
+            <ellipse cx="17.5" cy="10" rx="2.2" ry="3"/>
+          </svg>
+          Add Download
+        </h2>
         <button class="modal-close-btn" id="btn-close-modal">✕</button>
       </div>
 
       <div class="modal-body">
         <label class="modal-label">Paste URL or Content ID</label>
         <div class="url-input-wrap">
-          <input type="text" id="modal-url-input" class="modal-input" placeholder="e.g. Hugging Face, Ollama tag, Steam, YouTube, or direct link...">
+          <input type="text" id="modal-url-input" class="modal-input" placeholder="e.g. YouTube, Instagram, Pinterest, Hugging Face, Steam, or direct link...">
+        </div>
+
+        <!-- Probing Indicator -->
+        <div id="det-probing-indicator" class="probing-indicator" style="display: none;">
+          <span>🔍 Probing media streams & available qualities...</span>
         </div>
 
         <!-- Detection Result Box -->
         <div class="detection-card" id="detection-result-card" style="display: none;">
           <div class="det-header">
-            <span class="det-badge" id="det-badge-platform">Hugging Face</span>
+            <span class="det-badge" id="det-badge-platform">
+              <span id="det-badge-icon-wrap"></span>
+              <span id="det-badge-text">Hugging Face</span>
+            </span>
             <span class="det-content-type" id="det-content-type">Model Checkpoint (.safetensors)</span>
           </div>
+
           <div class="det-title-row">
-            <h3 class="det-title" id="det-title">model.safetensors</h3>
-          </div>
-          <div class="det-meta-row">
-            <span class="det-meta-item">Size: <strong id="det-size">Estimating...</strong></span>
-            <span class="det-meta-item">Resumable: <strong id="det-resumable">Yes</strong></span>
+            <img id="det-thumb" class="det-thumb-img" style="display:none;" alt="Thumbnail" />
+            <div style="flex: 1; min-width: 0;">
+              <h3 class="det-title" id="det-title">model.safetensors</h3>
+              <div class="det-meta-row" style="margin-top: 6px;">
+                <span class="det-meta-item">Size: <strong id="det-size">Estimating...</strong></span>
+                <span class="det-meta-item">Resumable: <strong id="det-resumable">Yes</strong></span>
+              </div>
+            </div>
           </div>
 
           <div class="det-options">
-            <label class="modal-label" style="margin-top: 12px;">Save As</label>
+            <!-- Dynamic Video Quality / Audio Selector -->
+            <div id="quality-selector-wrap" style="display: none;">
+              <label class="modal-label">Quality / Format</label>
+              <select id="det-quality-select" class="modal-select"></select>
+            </div>
+
+            <label class="modal-label" style="margin-top: 10px;">Save As</label>
             <input type="text" id="det-filename-input" class="modal-input" placeholder="Filename...">
             
-            <label class="modal-label" style="margin-top: 8px;">Download Destination</label>
-            <input type="text" id="det-dest-input" class="modal-input" placeholder="Destination directory...">
+            <label class="modal-label">Download Destination</label>
+            <div class="input-with-button">
+              <input type="text" id="det-dest-input" class="modal-input" placeholder="Destination directory...">
+              <button class="btn-subtle" id="btn-browse-dest-modal" type="button" style="white-space: nowrap; padding: 10px 14px; font-weight: 600;">Change</button>
+            </div>
           </div>
         </div>
 

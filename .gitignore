@@ -21,3 +21,7 @@ otter cli/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+__pycache__/
+*.pyc
+benchmark_results.json

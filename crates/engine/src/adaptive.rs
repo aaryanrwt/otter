@@ -30,8 +30,8 @@ pub struct AimdConfig {
 impl Default for AimdConfig {
     fn default() -> Self {
         Self {
-            min_concurrency: 2,
-            max_concurrency: 16,
+            min_concurrency: 1,
+            max_concurrency: 128,
             evaluation_interval: Duration::from_secs(5),
             throughput_gain_threshold: 0.10,
             backoff_duration: Duration::from_secs(5),
