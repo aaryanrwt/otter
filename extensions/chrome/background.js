@@ -18,6 +18,7 @@ async function checkBridgeStatus() {
       isBridgeConnected = true;
       chrome.action.setBadgeText({ text: "ON" });
       chrome.action.setBadgeBackgroundColor({ color: "#10B981" }); // Emerald
+      scanAndAccelerateActiveDownloads();
     } else {
       throw new Error("Bridge not OK");
     }
@@ -53,8 +54,23 @@ function sanitizeUrlForAudit(rawUrl) {
   }
 }
 
-// Listen for download creation
-chrome.downloads.onCreated.addListener(async (item) => {
+// Check and automatically accelerate any existing in-progress downloads
+async function scanAndAccelerateActiveDownloads() {
+  if (!isBridgeConnected || !autoHandoffEnabled) return;
+  chrome.downloads.search({ state: "in_progress" }, (items) => {
+    if (items) {
+      for (const item of items) {
+        if (!item.paused) {
+          handleBrowserDownload(item);
+        }
+      }
+    }
+  });
+}
+
+// Handler for browser downloads
+async function handleBrowserDownload(item) {
+  if (!item || !item.url) return;
   console.log("[OTTER Extension] Download initiated in Chrome:", item.id, item.filename, item.totalBytes);
 
   const payload = {
@@ -87,7 +103,7 @@ chrome.downloads.onCreated.addListener(async (item) => {
       // Safe Handoff Protocol:
       // If OTTER confirms eligibility and requests takeover:
       // 1. Chrome download is paused to prevent duplicate bandwidth consumption.
-      // 2. Once OTTER initializes file range preallocation on Drive D:, Chrome download is canceled.
+      // 2. OTTER Multi-Stream Engine (16 workers) takes over the transfer.
       if (response.handoff === "PAUSE_AND_TAKEOVER") {
         chrome.downloads.pause(item.id, () => {
           console.log("[OTTER Extension] Successfully paused Chrome download for OTTER handoff:", item.id);
@@ -101,6 +117,11 @@ chrome.downloads.onCreated.addListener(async (item) => {
   } catch (e) {
     console.warn("[OTTER Extension] Could not contact OTTER Bridge:", e.message);
   }
+}
+
+// Listen for download creation
+chrome.downloads.onCreated.addListener((item) => {
+  handleBrowserDownload(item);
 });
 
 // Listen for download state changes

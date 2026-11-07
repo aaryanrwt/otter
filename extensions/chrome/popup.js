@@ -374,13 +374,8 @@ function renderActiveDownloads(items) {
 
     const iconSvg = getMediaIconSvg(item.filename, item.domain);
     const ownershipBadge = item.is_otter
-      ? `<span class="ownership-tag tag-otter">OTTER Multi-Stream</span>`
+      ? `<span class="ownership-tag tag-otter">OTTER Multi-Stream Engine (16 workers)</span>`
       : `<span class="ownership-tag tag-native">Chrome Native</span>`;
-
-    // Accelerate button for Chrome native downloads
-    const handoffButton = !item.is_otter
-      ? `<button class="btn-handoff" data-id="${item.id}" title="Take over with OTTER 16-connection acceleration">⚡ Accelerate with OTTER</button>`
-      : "";
 
     card.innerHTML = `
       <div class="dl-top-row">
@@ -415,7 +410,6 @@ function renderActiveDownloads(items) {
           <button class="card-action-btn btn-cancel" data-id="${item.id}" title="Cancel">✕</button>
         </div>
       </div>
-      ${handoffButton}
     `;
 
     // Button actions
@@ -431,16 +425,6 @@ function renderActiveDownloads(items) {
     card.querySelector(".btn-cancel")?.addEventListener("click", () => {
       chrome.downloads.cancel(item.id);
       setTimeout(pollActiveState, 300);
-    });
-
-    // ⚡ Accelerate with OTTER Click Action
-    card.querySelector(".btn-handoff")?.addEventListener("click", () => {
-      startPreparingAnimation(() => {
-        chrome.runtime.sendMessage({ action: "FORCE_HANDOFF", downloadId: item.id }, (resp) => {
-          console.log("[OTTER Popup] Handoff response:", resp);
-          pollActiveState();
-        });
-      });
     });
 
     activeList.appendChild(card);

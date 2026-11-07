@@ -194,7 +194,7 @@ impl BrowserBridge {
             "Native Browser Download".to_string()
         };
 
-        let item = BrowserDownloadItem {
+        let mut item = BrowserDownloadItem {
             id,
             filename: if filename.is_empty() {
                 "download".to_string()
@@ -224,7 +224,54 @@ impl BrowserBridge {
         };
 
         let action = if auto_handoff && is_eligible {
-            "PAUSE_AND_TAKEOVER".to_string()
+            let manifest_opt = self.manifest.read().await.clone();
+            let manager_opt = self.manager.read().await.clone();
+            if let (Some(manifest), Some(manager)) = (manifest_opt, manager_opt) {
+                let default_dir = "D:\\".to_string();
+                let resolved_dir = BrowserBridge::resolve_download_destination_dir(
+                    &item.target_path,
+                    &default_dir,
+                );
+                let _ = std::fs::create_dir_all(&resolved_dir);
+                let job_id = format!(
+                    "{:x}",
+                    chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                );
+                let target_file = resolved_dir.join(&item.filename);
+
+                let job = types::JobRecord {
+                    id: job_id.clone(),
+                    url: item.url.clone(),
+                    filename: item.filename.clone(),
+                    destination: target_file.display().to_string(),
+                    total_size: item.total_bytes,
+                    downloaded_bytes: 0,
+                    status: types::DownloadStatus::Queued,
+                    resumable: true,
+                    etag: None,
+                    last_modified: None,
+                    expected_sha256: None,
+                    computed_sha256: None,
+                    error: None,
+                    created_at: chrono::Utc::now().timestamp_millis(),
+                    completed_at: None,
+                };
+                let _ = manifest.upsert_job(&job);
+
+                let mgr_clone = manager.clone();
+                let jid_clone = job_id.clone();
+                tokio::spawn(async move {
+                    let token = tokio_util::sync::CancellationToken::new();
+                    let _ = mgr_clone.run_job(&jid_clone, 16, token).await;
+                });
+
+                item.is_otter_managed = true;
+                item.engine_status = "OTTER Multi-Stream Active (16 Workers)".to_string();
+                item.otter_job_id = Some(job_id);
+                "PAUSE_AND_TAKEOVER".to_string()
+            } else {
+                "MONITOR_ONLY".to_string()
+            }
         } else {
             "MONITOR_ONLY".to_string()
         };
