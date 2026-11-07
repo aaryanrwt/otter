@@ -1,3 +1,23 @@
+// Open folder where file was downloaded
+function openFolderForDownload(downloadId, destinationPath) {
+  if (downloadId && typeof downloadId === "number") {
+    try {
+      chrome.downloads.show(downloadId);
+      return;
+    } catch (e) {
+      console.warn("chrome.downloads.show failed, trying bridge:", e);
+    }
+  }
+
+  if (destinationPath) {
+    fetch(`${OTTER_BRIDGE_URL}/api/browser/open_folder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: destinationPath })
+    }).catch(err => console.warn("Could not open folder via bridge:", err));
+  }
+}
+
 // OTTER Browser Extension — Popup Application Logic
 // Matches official 4-screen design from media_1794066109607_9f5403a4.jpg
 
@@ -32,7 +52,6 @@ const btnIdleHistory = document.getElementById("btn-idle-history");
 const historyList = document.getElementById("history-items-list");
 const btnClearHistory = document.getElementById("btn-clear-history");
 
-const settingEngineChoice = document.getElementById("setting-engine-choice");
 const settingHistoryChoice = document.getElementById("setting-history-choice");
 const toggleAutohandoff = document.getElementById("toggle-autohandoff");
 const toggleNotifications = document.getElementById("toggle-notifications");
@@ -41,7 +60,6 @@ const toggleProgressPopup = document.getElementById("toggle-progress-popup");
 const engineDot = document.getElementById("engine-dot");
 const engineStatusText = document.getElementById("engine-status-text");
 
-const ENGINE_CHOICES = ["Auto (Recommended)", "Force OTTER Multi-Stream", "Chrome Native Only"];
 const HISTORY_CHOICES = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "Keep Forever"];
 
 // Initialize on popup load
@@ -98,16 +116,7 @@ function setupTabs() {
     historyList.innerHTML = `<div class="empty-state">No download history.</div>`;
   });
 
-  // Settings: Download Engine Choice
-  if (settingEngineChoice) {
-    settingEngineChoice.addEventListener("click", () => {
-      const current = settingEngineChoice.querySelector("span")?.textContent || ENGINE_CHOICES[0];
-      const nextIdx = (ENGINE_CHOICES.indexOf(current) + 1) % ENGINE_CHOICES.length;
-      const nextVal = ENGINE_CHOICES[nextIdx];
-      settingEngineChoice.querySelector("span").textContent = nextVal;
-      chrome.storage.local.set({ downloadEngine: nextVal });
-    });
-  }
+
 
   // Settings: Keep History Choice
   if (settingHistoryChoice) {
@@ -168,9 +177,7 @@ function loadSettings() {
       if (toggleNotifications) toggleNotifications.checked = res.notificationsEnabled !== false;
       if (toggleProgressPopup) toggleProgressPopup.checked = res.showProgressPopup !== false;
 
-      if (settingEngineChoice && res.downloadEngine) {
-        settingEngineChoice.querySelector("span").textContent = res.downloadEngine;
-      }
+
       if (settingHistoryChoice && res.keepHistory) {
         settingHistoryChoice.querySelector("span").textContent = res.keepHistory;
       }
@@ -465,19 +472,29 @@ function renderHistoryCards(items) {
     card.className = "history-card";
     const iconSvg = getMediaIconSvg(item.filename, "");
 
+    card.style.cursor = "pointer";
     card.innerHTML = `
       <div class="hist-icon" style="background: #FFE4E8;">
         ${iconSvg}
       </div>
       <div class="hist-info">
         <div class="hist-title" title="${escapeHtml(item.filename)}">${escapeHtml(item.filename)}</div>
-        <div class="hist-meta">${formatBytes(item.total_bytes)} • ${escapeHtml(item.time_ago)}</div>
+        <div class="hist-meta">${formatBytes(item.total_bytes)} • ${escapeHtml(item.time_ago || "Completed")}</div>
       </div>
       <div class="completed-badge">
         <span>✓ Completed</span>
       </div>
-      <button class="menu-dots-btn" title="Actions">⋮</button>
+      <button class="menu-dots-btn" title="Open containing folder">⋮</button>
     `;
+
+    card.querySelector(".menu-dots-btn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openFolderForDownload(item.id, item.destination || item.filename);
+    });
+    card.addEventListener("click", () => {
+      openFolderForDownload(item.id, item.destination || item.filename);
+    });
+
     historyList.appendChild(card);
   });
 }
@@ -494,6 +511,7 @@ function renderHistoryFromChrome(items) {
     const iconSvg = getMediaIconSvg(fn, c.url || "");
     const card = document.createElement("div");
     card.className = "history-card";
+    card.style.cursor = "pointer";
 
     card.innerHTML = `
       <div class="hist-icon" style="background: #FFE4E8;">
@@ -506,8 +524,17 @@ function renderHistoryFromChrome(items) {
       <div class="completed-badge">
         <span>✓ Completed</span>
       </div>
-      <button class="menu-dots-btn" title="Actions">⋮</button>
+      <button class="menu-dots-btn" title="Open containing folder">⋮</button>
     `;
+
+    card.querySelector(".menu-dots-btn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openFolderForDownload(c.id, c.filename);
+    });
+    card.addEventListener("click", () => {
+      openFolderForDownload(c.id, c.filename);
+    });
+
     historyList.appendChild(card);
   });
 }

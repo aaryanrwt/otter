@@ -169,6 +169,7 @@ impl BrowserBridge {
         &self,
         id: i64,
         raw_url: String,
+        final_url: Option<String>,
         filename: String,
         target_path: String,
         mime_type: String,
@@ -178,8 +179,20 @@ impl BrowserBridge {
     ) -> String {
         let (sanitized_url, domain) = Self::sanitize_url(&raw_url);
 
-        // Probe for Range acceleration eligibility
-        let (is_eligible, probed_size, _etag) = self.probe_range_support(&raw_url).await;
+        // Probe for Range acceleration eligibility (prefer resolved final CDN url if available)
+        let probe_target = final_url.as_deref().unwrap_or(&raw_url);
+        let mut probe_res = self.probe_range_support(probe_target).await;
+        let mut active_download_url = probe_target.to_string();
+
+        if !probe_res.0 && probe_target != raw_url.as_str() {
+            probe_res = self.probe_range_support(&raw_url).await;
+            if probe_res.0 {
+                active_download_url = raw_url.clone();
+            }
+        }
+
+        let is_eligible = probe_res.0;
+        let probed_size = probe_res.1;
         let final_total = total_bytes.or(probed_size);
 
         let initial_status = if is_eligible {
@@ -201,7 +214,7 @@ impl BrowserBridge {
             } else {
                 filename
             },
-            url: raw_url,
+            url: active_download_url.clone(),
             sanitized_url,
             domain,
             target_path,
@@ -645,10 +658,16 @@ async fn handle_connection(mut stream: TcpStream, bridge: BrowserBridge) -> Resu
                     .and_then(|x| x.as_bool())
                     .unwrap_or(false);
 
+                let final_url = v
+                    .get("final_url")
+                    .and_then(|x| x.as_str())
+                    .map(|s| s.to_string());
+
                 let handoff_action = bridge
                     .handle_download_created(
                         id,
                         url,
+                        final_url,
                         filename,
                         target_path,
                         mime,
@@ -763,6 +782,27 @@ async fn handle_connection(mut stream: TcpStream, bridge: BrowserBridge) -> Resu
                 send_error_response(&mut stream, 400, "Invalid JSON body").await?;
             }
         }
+        ("POST", "/api/browser/open_folder") => {
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+                let path_str = v.get("path").and_then(|p| p.as_str()).unwrap_or("");
+                if !path_str.is_empty() {
+                    let p = std::path::PathBuf::from(path_str);
+                    if p.exists() {
+                        let _ = std::process::Command::new("explorer")
+                            .arg(format!("/select,{}", p.display()))
+                            .spawn();
+                    } else if let Some(parent) = p.parent() {
+                        if parent.exists() {
+                            let _ = std::process::Command::new("explorer").arg(parent).spawn();
+                        }
+                    }
+                }
+                let resp_json = serde_json::json!({ "success": true });
+                send_json_response(&mut stream, 200, &resp_json).await?;
+            } else {
+                send_error_response(&mut stream, 400, "Invalid JSON body").await?;
+            }
+        }
         _ => {
             send_error_response(&mut stream, 404, "Endpoint not found").await?;
         }
@@ -848,6 +888,7 @@ mod tests {
             .handle_download_created(
                 101,
                 "https://example.com/test.zip".into(),
+                None,
                 "test.zip".into(),
                 "C:\\Downloads\\test.zip".into(),
                 "application/zip".into(),
